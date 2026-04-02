@@ -1,0 +1,25 @@
+# virtualenv
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets — never commit
+.env
+credentials.json
+token.json
+*-credentials.json
+service-account*.json
+hypercare-automation-*.json
+
+# Per-client configs contain spreadsheet IDs (may be sensitive) — commit example only
+config/clients/*.json
+!config/clients/example.json
+
+# Legacy flat client list
+config/clients.json
+
+# ATS config files contain public URLs (safe to commit), but exclude nothing here
+# config/ats/ is intentionally NOT gitignored

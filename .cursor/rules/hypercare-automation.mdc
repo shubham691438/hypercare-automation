@@ -1,0 +1,203 @@
+---
+description: Hypercare automation — project conventions, config tiers, safety rules
+alwaysApply: true
+---
+
+# Hypercare Automation — Cursor Rules
+
+## Config tiers (strict separation)
+
+There are three tiers. Never mix them.
+
+| Tier | File | Contents |
+|------|------|----------|
+| **Secrets** | `.env` | Passwords, tokens, service-account path — one flat file, gitignored |
+| **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, hypercare days, enabled trackers, DB IDs, Mojo IDs, ATS provider key — gitignored except `example.json` |
+| **Per-ATS** | `config/ats/<provider>/<client>.json` | Public URLs and other non-secret per-client ATS config — safe to commit |
+
+- Never put tokens or passwords in JSON config files.
+- Prefer client config for per-client IDs and settings. The client JSON is the onboarding contract and must include `go_live_date`, `hypercare_days`, and `enabled_tabs`.
+
+## Key modules — use these, don't bypass them
+
+- `client_config.load_client_config(client_id)` → full client config dict
+- `client_config.hypercare_status(client_id)` → active/not-started/completed lifecycle metadata
+- `client_config.list_client_ids()` → all configured clients for batch runs
+- `client_config.resolve_spreadsheet_id()` → active Google Sheet ID
+- `sheets_client.SheetsClient` → all Google Sheets reads and writes
+- `db_readonly` → PostgreSQL; always read-only
+- `mojo_jobs.fetch_open_jobs_metrics()` → Mojo open-job count + latest startDate
+- `mojo_jobs.fetch_sponsored_applies()` → Mojo publishers applies count
+- `mojo_jobs.fetch_sponsored_stage_counts()` → Mojo funnel stage setup + `tthStats`
+- `ats.base.fetch_website_open_jobs(provider, client_key)` → ATS website count
+
+## Database safety — never weaken
+
+- All connections go through `db_readonly.connect_readonly_session()` which sets `default_transaction_read_only=on`.
+- `assert_read_only_sql()` is called before every query execution; it rejects non-`SELECT`/`WITH` statements.
+- New SQL queries belong in the **Query registry** tab (A–F) in the sheet, not hardcoded in scripts.
+- Use `__REPORT_DATE__` as the date placeholder in SQL; the runner substitutes it at run time.
+
+## Dates and timezones
+
+- **Job Ingestion** queries use **today** (`HYPERCARE_JOB_DATE` env override).
+- **Mojo Apply / Funnel Tracking** queries use **yesterday** (`HYPERCARE_REPORT_DATE` env override).
+- All timestamps written to the sheet must be **IST** (`AT TIME ZONE 'Asia/Kolkata'` in SQL, or `_utc_to_ist()` in Python).
+
+## Hypercare lifecycle
+
+- Use **one spreadsheet per client**.
+- A client remains active for `hypercare_days` starting from `go_live_date`.
+- The daily runner must append rows only while the client is active.
+- Do not delete historical rows when hypercare ends; stop appending and update `Overview` / `Run log`.
+- If `go_live_date` is missing, allow the run but surface lifecycle status clearly in `Overview`.
+
+## Job Ingestion layout
+
+- `Job Ingestion` is a native Google Sheets table named `JobIngestion`.
+- Row `1` is the header row. Rows `2+` are append-only daily history.
+- Current layout:
+  - `A` date
+  - `B` ATS open jobs
+  - `C` Unified open jobs
+  - `D` Tao open jobs
+  - `E` Mojo open jobs
+  - `F` delta (`Mojo - ATS`)
+  - `G` last OPEN job updated (IST)
+  - `H` last CLOSED job updated (IST)
+  - `I` null Mojo↔Tao mappings
+- Keep native table styling as the source of truth for the header. Do not add custom header fills on top of it.
+- If changing the layout, update all three places together:
+  1. `JOB_INGESTION_HEADERS` / table definition in `hypercare_bootstrap.py`
+  2. registry output cells in `hypercare_bootstrap.py`
+  3. append-row writes / conditional formatting in `run_hypercare_queries.py` and `hypercare_formatting.py`
+
+## Mojo Apply layout
+
+- `Mojo Apply` is a native Google Sheets table named `MojoApply`.
+- Row `1` is the header row. Rows `2+` are append-only daily history.
+- Current layout:
+  - `A` date
+  - `B` sponsored applies on Mojo
+  - `C` sponsored applies in Tao
+  - `D` delta Mojo vs CRM (%)
+  - `E` total applies in CRM
+  - `F` CRM creation failed
+  - `G` ATS rejected
+  - `H` ATS rejected out of total applies in CRM (%)
+- `B` is Mojo API driven; `C/E/F/G` are Tao SQL; `D/H` are computed in Python during append.
+
+## Funnel Tracking layout
+
+- `Funnel Tracking` is a native Google Sheets table named `FunnelTracking`.
+- Row `1` is the header row. Rows `2+` are append-only stage history.
+- Current layout:
+  - `A` date
+  - `B` Mojo stage key
+  - `C` CRM stage mapping from Mojo setup API
+  - `D` CRM count - all
+  - `E` CRM count - sponsored
+  - `F` Mojo count - sponsored
+  - `G` delta CRM sponsored vs Mojo (%)
+- Funnel rows are built in Python, not seeded into the Query registry.
+- The funnel mapping comes from the Mojo setup API. `order=1 → tth1`, `order=2 → tth2`, etc.
+- Keep the funnel display row-based. Do not collapse the mapping + counts back into a single wrapped cell.
+- Append one row per stage for each run-day; do not clear prior stage blocks.
+
+## Job Ingestion color rules
+
+- `F:F` delta:
+  - green: `abs(delta) <= 10%` of ATS
+  - yellow: `10% < abs(delta) <= 25%`
+  - red: `abs(delta) > 25%`
+- `G:G` and `H:H`:
+  - green: timestamp is today
+  - red: timestamp is before today
+- `I:I`:
+  - green: `0`
+  - red: `>= 1`
+
+## Shared percent color rules
+
+- Use the same traffic-light thresholds for all percent delta fields:
+  - green: `<= 10%`
+  - yellow: `> 10%` and `<= 25%`
+  - red: `> 25%`
+- Current percent fields:
+  - `Job Ingestion!F2:F`
+  - `Mojo Apply!D2:D`
+  - `Mojo Apply!H2:H`
+  - `Funnel Tracking!G2:G`
+- Keep percent number formatting at `0.00%`.
+
+## Native table ownership
+
+- `Job Ingestion`, `Mojo Apply`, and `Funnel Tracking` all use native Google Sheets tables.
+- When changing a table layout, update all of:
+  1. header constants
+  2. table definition / `columnType`
+  3. seeded visible header cells
+  4. formatting widths / conditional formatting
+  5. runner writes and formulas
+- After table updates, re-apply visible header labels because the Sheets API can reset them to `Column 1..N`.
+
+## ATS provider pattern
+
+To add a new ATS provider, follow this checklist exactly:
+
+1. `src/ats/<provider>/__init__.py` (empty)
+2. `src/ats/<provider>/jobs.py` with `fetch_open_jobs(client_key: str) -> int`
+3. `config/ats/<provider>/example.json` (minimum non-secret request template)
+4. `config/ats/<provider>/<client>.json` (per-client non-secret config)
+5. Add routing in `src/ats/base.py → _dispatch()`
+6. Document new env vars in `env.example` only if the provider truly needs them
+
+Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
+
+## New client checklist
+
+1. `config/clients/<id>.json` — copy from `example.json`
+2. `config/ats/<provider>/<id>.json` — copy from provider `example.json`
+3. Fill in `go_live_date`, `hypercare_days`, and `enabled_tabs`
+4. `HYPERCARE_CLIENT=<id>` in `.env`
+5. Run bootstrap, then run the main script
+
+## Multi-client operations
+
+- `scripts/create_client.py` scaffolds a new client config + ATS config from templates.
+- `scripts/run_all_active_clients.py` loops through `config/clients/*.json` and runs only active clients.
+- `scripts/run_hypercare_queries.py` must append new rows; it must not overwrite row `2` as the primary storage model.
+
+## Mojo token refresh
+
+The Mojo `MOJO_ACCESS_TOKEN` is a Cognito JWT that expires in ~2 hours.
+
+### CRITICAL: must be a `mojopro` token, not a `TALENT_ENGAGE` token
+
+There are **two different Cognito JWT types** issued by Joveo:
+
+| Type | `productId` claim | Source | Works for |
+|------|-------------------|--------|-----------|
+| **mojopro** (correct) | `mojopro` | `mojopro.joveo.com` | All Mojo APIs: jobs, publishers, funnel-tracking |
+| TALENT_ENGAGE (wrong) | `TALENT_ENGAGE` | Other Joveo products | Jobs/publishers only (lenient); **funnel-tracking → 401** |
+
+The `funnel-tracking` API strictly validates `productId: mojopro`. The jobs and publishers endpoints are more lenient and may accept either — which is why `Job Ingestion!E2` can succeed while `Funnel Tracking` fails with 401 in the same run.
+
+**How to confirm the token type before pasting:** decode the JWT payload (base64 part 2, e.g. `python3 -c "import base64,json,sys; p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); print(json.loads(base64.urlsafe_b64decode(p))['productId'])" YOUR_TOKEN`). It must print `mojopro`.
+
+### How to get a fresh `mojopro` token
+
+1. Open [https://mojopro.joveo.com](https://mojopro.joveo.com) and log in.
+2. Open DevTools → **Network** tab → filter by Fetch/XHR.
+3. Click any page that makes an API call (e.g. navigate to Funnel Tracking).
+4. Find a request to `mojopro.joveo.com/...`, click it, go to **Request Headers**.
+5. Copy the value of the `accessToken` header.
+6. Paste it into `.env` as `MOJO_ACCESS_TOKEN=<value>`.
+7. Verify: the decoded token should have `productId: mojopro` (not `TALENT_ENGAGE`).
+
+When Mojo-backed cells fail with `401` or `Invalid value for: header accessToken`, check **both** expiry and token type.
+
+Mojo-backed areas currently include:
+- `Job Ingestion!E2`
+- `Mojo Apply!B2`
+- `Funnel Tracking` rows `2+`

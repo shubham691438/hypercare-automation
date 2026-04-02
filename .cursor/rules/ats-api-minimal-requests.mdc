@@ -1,0 +1,50 @@
+---
+description: ATS API integration — minimum requests, minimum config per client
+globs: src/ats/**/*.py, config/ats/**/*.json
+alwaysApply: false
+---
+
+# ATS API — Minimum Request & Minimum Config Rules
+
+## 1. Minimum headers per request
+
+Use only the headers the API strictly requires. Start with `Content-Type: application/json` and nothing else. Do not add `cookie`, `authorization`, `x-requestverificationtoken`, `user-agent`, `referer`, or `origin` unless a 4xx response proves they are needed.
+
+```python
+# Correct
+resp = requests.post(url, headers={"Content-Type": "application/json"}, json=body)
+
+# Wrong — do not copy browser headers blindly
+resp = requests.post(url, headers={"cookie": "...", "origin": "...", ...}, json=body)
+```
+
+## 2. Minimum config per client
+
+Only store what **changes between clients** in `config/ats/<provider>/<client>.json`. Everything constant across all clients of the same provider belongs in code.
+
+| Put in config file | Hardcode in `jobs.py` |
+|--------------------|-----------------------|
+| URL (differs per client) | Request body (same for all UKG clients) |
+| Client-specific IDs | Common filters / pagination defaults |
+
+UKG example — config file is just one line:
+```json
+{ "url": "https://recruiting2.ultipro.com/..." }
+```
+
+Current UKG convention in this project:
+- URL stays in `config/ats/ukg/<client>.json`
+- request body stays hardcoded in `src/ats/ukg/jobs.py`
+- do not move short-lived tokens, cookies, or copied browser headers into config
+
+## 3. Verify unauthenticated access first
+
+Before adding any credential to config or `.env`, test the stripped request. Public ATS job boards are usually open APIs.
+
+## 4. Ask minimum info when onboarding a new ATS client
+
+When setting up a new ATS client, ask only for what is needed for that provider:
+- **UKG**: only the `LoadSearchResults` URL (from the job board page source or network tab)
+- No cookies, tokens, or browser session data needed
+
+Document the minimum required fields in `config/ats/<provider>/example.json`.

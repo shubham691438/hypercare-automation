@@ -1,0 +1,39 @@
+{
+  "id": "clientname",
+  "name": "Human-readable client name",
+  "spreadsheet_id": "GOOGLE_SHEET_ID_HERE",
+  "go_live_date": "2026-04-01",
+  "hypercare_days": 10,
+  "enabled_tabs": [
+    "job_ingestion",
+    "mojo_apply",
+    "funnel_tracking"
+  ],
+  "owner": "owner@example.com",
+  "client_contacts": [
+    "stakeholder1@example.com",
+    "stakeholder2@example.com"
+  ],
+
+  "ats": {
+    "provider": "ukg",
+    "client_key": "clientname"
+  },
+
+  "mojo": {
+    "account_id": "mojo-account-id",
+    "agency_id": "mojo-agency-id",
+    "client_id": "mojo-client-uuid",
+    "jobs_path": "/fna-dashboard/v1/agencies/<agency>/jobs?page-type=CLIENT_JOBS"
+  },
+
+  "db": {
+    "unified": {
+      "customer_id": "unified-db-customer-uuid"
+    },
+    "tao": {
+      "source_id": "tao-source-id",
+      "client_id": "tao-client-id"
+    }
+  }
+}
