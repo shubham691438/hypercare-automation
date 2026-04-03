@@ -116,11 +116,12 @@ Hypercare-Automation/
 │   ├── sheets_client.py
 │   └── website_jobs.py
 └── scripts/
-    ├── create_client.py
+    ├── run_hypercare_queries.py      ← daily runner (single run, today)
+    ├── run_for_dates.py              ← run for a specific date or last N days
+    ├── run_all_active_clients.py     ← loop all active clients
     ├── bootstrap_hypercare_workbook.py
-    ├── run_hypercare_queries.py
-    ├── run_all_active_clients.py
     ├── verify_hypercare_sheet.py
+    ├── create_client.py
     └── duplicate_tabs_for_testing.py
 ```
 
@@ -188,6 +189,37 @@ HYPERCARE_JOB_DATE=2026-03-31 HYPERCARE_REPORT_DATE=2026-03-30 \
 
 `HYPERCARE_JOB_DATE` sets the date for `Job Ingestion`.
 `HYPERCARE_REPORT_DATE` sets the date for `Mojo Apply` and `Funnel Tracking` (defaults to one day before `HYPERCARE_JOB_DATE`).
+
+### Run for a specific date or last N days
+
+Use `scripts/run_for_dates.py` for backfills, replays, or rolling windows.
+Dates are always run in **chronological order** (oldest → newest) so rows land in the correct order in the sheet.
+Re-running a date that already has data updates the existing row in-place — no duplicates.
+
+```bash
+# Single date
+PYTHONPATH=src .venv/bin/python scripts/run_for_dates.py --date 2026-04-01
+
+# Last 5 days (today inclusive), oldest first
+PYTHONPATH=src .venv/bin/python scripts/run_for_dates.py --last 5
+
+# Explicit date range
+PYTHONPATH=src .venv/bin/python scripts/run_for_dates.py --from 2026-03-28 --to 2026-04-03
+
+# Preview what would run without executing
+PYTHONPATH=src .venv/bin/python scripts/run_for_dates.py --last 7 --dry-run
+```
+
+| Flag | Description |
+|---|---|
+| `--date YYYY-MM-DD` | Run for one specific job date |
+| `--last N` | Last N calendar days ending today (inclusive) |
+| `--from YYYY-MM-DD` | Start of a date range (use with `--to`) |
+| `--to YYYY-MM-DD` | End of a date range, defaults to today |
+| `--dry-run` | Print dates that would run; don't execute |
+
+> **Date mapping**: `job_date` is the date you pass; `report_date` is always `job_date − 1 day`.
+> `Job Ingestion` uses `job_date`; `Mojo Apply` and `Funnel Tracking` use `report_date`.
 
 ### Run all active clients
 
