@@ -452,7 +452,13 @@ def build_funnel_table_rows(
     mojo_stages: list[dict[str, object]],
     crm_all_counts: dict[str, int],
     crm_sponsored_counts: dict[str, int],
+    cum_stage_sums: dict[str, tuple[float, float, float]] | None = None,
 ) -> list[list[str]]:
+    """Build funnel rows with optional cumulative columns (H–K).
+
+    cum_stage_sums: dict mapping stage_key -> (cum_crm_all, cum_crm_sponsored, cum_mojo)
+    accumulated from all prior dates. Today's values are added on top.
+    """
     rows: list[list[str]] = []
     for stage in mojo_stages:
         mapping = str(stage.get("mapping") or "").strip()
@@ -466,16 +472,39 @@ def build_funnel_table_rows(
             delta_pct = 0.0 if mojo_count == 0 else 1.0
         else:
             delta_pct = abs(crm_sponsored_total - mojo_count) / crm_sponsored_total
+
+        stage_key = str(stage.get("key") or "")
+
+        # Cumulative columns
+        if cum_stage_sums is not None:
+            prev = cum_stage_sums.get(stage_key, (0.0, 0.0, 0.0))
+            c_all = prev[0] + crm_all_total
+            c_spons = prev[1] + crm_sponsored_total
+            c_mojo = prev[2] + mojo_count
+            if c_spons == 0:
+                c_delta = 0.0 if c_mojo == 0 else 1.0
+            else:
+                c_delta = abs(c_spons - c_mojo) / c_spons
+            cum_cells = [
+                str(int(c_all)),
+                str(int(c_spons)),
+                str(int(c_mojo)),
+                str(c_delta),
+            ]
+        else:
+            cum_cells = ["", "", "", ""]
+
         rows.append(
             [
                 report_date,
-                str(stage.get("key") or ""),
+                stage_key,
                 mapping,
                 str(crm_all_total),
                 str(crm_sponsored_total),
                 str(mojo_count),
                 str(delta_pct),
             ]
+            + cum_cells
         )
     return rows
 
@@ -933,36 +962,63 @@ def main() -> None:
 
     if TRACKER_FUNNEL_TRACKING in active_trackers:
         if funnel_crm_error:
-            funnel_rows = [[rdate, "ERROR", funnel_crm_error, "", "", "", ""]]
+            funnel_rows = [[rdate, "ERROR", funnel_crm_error, "", "", "", "", "", "", "", ""]]
         elif funnel_stage_error:
-            funnel_rows = [[rdate, "ERROR", funnel_stage_error, "", "", "", ""]]
+            funnel_rows = [[rdate, "ERROR", funnel_stage_error, "", "", "", "", "", "", "", ""]]
         else:
+            # Build per-stage cumulative sums from all prior date blocks
+            existing_funnel = sheets.get_range(f"'{TAB_FUNNEL}'!A2:F{1000}")
+            rdate_parsed = _parse_date_loose(rdate)
+            # stage_key -> (cum_crm_all, cum_crm_sponsored, cum_mojo)
+            cum_stage_sums: dict[str, tuple[float, float, float]] = {}
+            for erow in existing_funnel:
+                if not erow or not str(erow[0]).strip():
+                    continue
+                row_date = _parse_date_loose(str(erow[0]).strip())
+                if row_date is None:
+                    continue
+                # Skip current date — we add today's fresh values in build_funnel_table_rows
+                if _dates_equal(str(erow[0]), rdate):
+                    continue
+                # Only include rows up to (not including) current date
+                if rdate_parsed is not None and row_date > rdate_parsed:
+                    continue
+                stage_key = str(erow[1]).strip() if len(erow) > 1 else ""
+                if not stage_key:
+                    continue
+                d_all = to_number(erow[3]) if len(erow) > 3 else None
+                d_spons = to_number(erow[4]) if len(erow) > 4 else None
+                d_mojo = to_number(erow[5]) if len(erow) > 5 else None
+                prev = cum_stage_sums.get(stage_key, (0.0, 0.0, 0.0))
+                cum_stage_sums[stage_key] = (
+                    prev[0] + (d_all or 0.0),
+                    prev[1] + (d_spons or 0.0),
+                    prev[2] + (d_mojo or 0.0),
+                )
             funnel_rows = build_funnel_table_rows(
                 rdate,
                 sponsored_stage_counts,
                 crm_all_counts,
                 crm_sponsored_counts,
+                cum_stage_sums=cum_stage_sums,
             )
         if funnel_rows:
             funnel_start, existing_len = find_funnel_block_start(sheets, TAB_FUNNEL, date_val=rdate)
-            # Write blank separator row for new date blocks (funnel_start > 2 means
-            # there is existing data above; the blank goes at funnel_start - 1)
             if existing_len == 0 and funnel_start > 2:
                 sheets.update_range(
-                    f"'{TAB_FUNNEL}'!A{funnel_start - 1}:G{funnel_start - 1}",
-                    [[""] * 7],
+                    f"'{TAB_FUNNEL}'!A{funnel_start - 1}:K{funnel_start - 1}",
+                    [[""] * 11],
                 )
             funnel_end_row = funnel_start + len(funnel_rows) - 1
             sheets.update_range(
-                f"'{TAB_FUNNEL}'!A{funnel_start}:G{funnel_end_row}",
+                f"'{TAB_FUNNEL}'!A{funnel_start}:K{funnel_end_row}",
                 funnel_rows,
             )
-            # If the re-run block is shorter than the stored one, clear leftover rows
             if existing_len > len(funnel_rows):
-                blank = [[""] * 7] * (existing_len - len(funnel_rows))
+                blank = [[""] * 11] * (existing_len - len(funnel_rows))
                 clear_start = funnel_start + len(funnel_rows)
                 sheets.update_range(
-                    f"'{TAB_FUNNEL}'!A{clear_start}:G{clear_start + len(blank) - 1}",
+                    f"'{TAB_FUNNEL}'!A{clear_start}:K{clear_start + len(blank) - 1}",
                     blank,
                 )
 

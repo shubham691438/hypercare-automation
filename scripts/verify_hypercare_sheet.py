@@ -54,7 +54,7 @@ def main() -> None:
     mojo_rows = c.get_range(f"'{TAB_MOJO}'!A2:O1000")
     print(f"{TAB_MOJO} latest row:", last_nonempty_row(mojo_rows))
     print()
-    funnel_rows = c.get_range(f"'{TAB_FUNNEL}'!A2:G1000")
+    funnel_rows = c.get_range(f"'{TAB_FUNNEL}'!A2:K1000")
     tail_funnel = funnel_rows[-12:] if funnel_rows and len(funnel_rows) > 12 else funnel_rows
     print(f"{TAB_FUNNEL} last up to 12 rows:", tail_funnel)
     print()

@@ -56,6 +56,10 @@ FUNNEL_HEADERS = [
     "CRM Count - Sponsored",
     "Mojo Count - Sponsored",
     "Delta CRM Sponsored vs Mojo (%)",
+    "Cum. CRM Count - All",
+    "Cum. CRM Count - Sponsored",
+    "Cum. Mojo Count - Sponsored",
+    "Cum. Delta CRM Sponsored vs Mojo (%)",
 ]
 
 ORDERED_TABS = [
@@ -198,15 +202,15 @@ def ensure_funnel_native_table(client: SheetsClient) -> None:
             "startRowIndex": 0,
             "endRowIndex": TABLE_MAX_ROWS,
             "startColumnIndex": 0,
-            "endColumnIndex": 7,
+            "endColumnIndex": 11,
         },
         "columnProperties": [
             {
                 "columnIndex": i,
                 "columnName": name,
                 **({"columnType": "DATE"} if i == 0 else {}),
-                **({"columnType": "DOUBLE"} if i in (3, 4, 5) else {}),
-                **({"columnType": "PERCENT"} if i == 6 else {}),
+                **({"columnType": "DOUBLE"} if i in (3, 4, 5, 7, 8, 9) else {}),
+                **({"columnType": "PERCENT"} if i in (6, 10) else {}),
             }
             for i, name in enumerate(FUNNEL_HEADERS)
         ],
@@ -344,7 +348,7 @@ def clear_funnel_manual_header_format(client: SheetsClient) -> None:
                         "startRowIndex": 0,
                         "endRowIndex": 1,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 7,
+                        "endColumnIndex": 11,
                     },
                     "cell": {"userEnteredFormat": {}},
                     "fields": "userEnteredFormat(backgroundColor,textFormat,wrapStrategy,verticalAlignment)",
@@ -368,7 +372,7 @@ def clear_funnel_extra_area_format(client: SheetsClient) -> None:
                         "sheetId": sid,
                         "startRowIndex": 0,
                         "endRowIndex": TABLE_MAX_ROWS,
-                        "startColumnIndex": 7,
+                        "startColumnIndex": 11,
                         "endColumnIndex": 26,
                     },
                     "cell": {"userEnteredFormat": {}},
@@ -625,7 +629,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
         client.update_range(f"'{TAB_MOJO}'!A1:O1", [MOJO_APPLY_HEADERS])
 
     if TAB_FUNNEL in titles:
-        client.update_range(f"'{TAB_FUNNEL}'!A1:G1", [FUNNEL_HEADERS])
+        client.update_range(f"'{TAB_FUNNEL}'!A1:K1", [FUNNEL_HEADERS])
 
     if TAB_WEBSITE in titles:
         client.update_range(
@@ -670,4 +674,4 @@ def bootstrap_hypercare_workbook(client: SheetsClient, *, overwrite: bool = Fals
     if TAB_MOJO in titles:
         client.update_range(f"'{TAB_MOJO}'!A1:O1", [MOJO_APPLY_HEADERS])
     if TAB_FUNNEL in titles:
-        client.update_range(f"'{TAB_FUNNEL}'!A1:G1", [FUNNEL_HEADERS])
+        client.update_range(f"'{TAB_FUNNEL}'!A1:K1", [FUNNEL_HEADERS])

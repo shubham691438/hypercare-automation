@@ -119,20 +119,25 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
 
 ## Funnel Tracking layout
 
-- `Funnel Tracking` is a native Google Sheets table named `FunnelTracking`.
-- Row `1` is the header row. Rows `2+` are append-only stage history.
-- Current layout:
+- `Funnel Tracking` is a native Google Sheets table named `FunnelTracking` (**11** columns `A:K`).
+- Row `1` is the header row. Rows `2+` are append-only stage history (multiple rows per `HYPERCARE_REPORT_DATE`, one per Mojo stage).
+- **Daily block `A:G`:**
   - `A` date
   - `B` Mojo stage key
-  - `C` CRM stage mapping from Mojo setup API
-  - `D` CRM count - all
-  - `E` CRM count - sponsored
-  - `F` Mojo count - sponsored
-  - `G` delta CRM sponsored vs Mojo (%)
-- Funnel rows are built in Python, not seeded into the Query registry.
-- The funnel mapping comes from the Mojo setup API. `order=1 → tth1`, `order=2 → tth2`, etc.
-- Keep the funnel display row-based. Do not collapse the mapping + counts back into a single wrapped cell.
-- Append one row per stage for each run-day; do not clear prior stage blocks.
+  - `C` CRM stage mapping (Mojo setup API)
+  - `D` CRM count - all (Tao DB, aggregated over mapped CRM stages in `C`)
+  - `E` CRM count - sponsored (Tao DB)
+  - `F` Mojo count - sponsored (Mojo publishers `tthStats`)
+  - `G` delta CRM sponsored vs Mojo (%) — computed in `build_funnel_table_rows` (ratio for `PERCENT` display)
+- **Cumulative block `H:K`** (per stage key `B`):
+  - `H`–`J` cumulative CRM all / CRM sponsored / Mojo sponsored — sum of daily `D`/`E`/`F` for that stage across prior sheet rows (excluding the current report date) plus today; see `cum_stage_sums` in `run_hypercare_queries.py`
+  - `K` cumulative delta % — recomputed from cumulative `I`/`J`, **not** a sum of daily `G`
+- Prior rows are scanned with `get_range(..., A2:F1000)` so only **daily** `D/E/F` contribute to cumulative sums (not double-counting old `H:K`).
+- Writes use `A{funnel_start}:K{...}`; blank separator row cleared with `A{funnel_start-1}:K{...}` when needed; `blank = [[""]*11]` for shrinking a block.
+- Funnel rows are built in Python (`build_funnel_table_rows`), not seeded into the Query registry.
+- Mapping: Mojo setup `order=N` → `tthN` in publishers `tthStats`.
+- Keep the funnel display row-based; append one row per stage per run-day; do not clear prior stage blocks except the runner’s same-date overwrite path via `find_funnel_block_start`.
+- If changing this layout, update together: `FUNNEL_HEADERS` + native table in `hypercare_bootstrap.py` (`endColumnIndex` 11, `DOUBLE` on `3–5` and `7–9`, `PERCENT` on `6` and `10`), `build_funnel_table_rows` + funnel write block in `run_hypercare_queries.py`, `clear_funnel_*` column spans, `hypercare_formatting.py` (11 widths + percent CF on `G` and `K`), `verify_hypercare_sheet.py` read range.
 
 ## Job Ingestion color rules
 
@@ -160,7 +165,7 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
   - `Job Ingestion!F2:F`
   - `Mojo Apply!D2:D`, `Mojo Apply!H2:H` (daily)
   - `Mojo Apply!K2:K`, `Mojo Apply!O2:O` (cumulative)
-  - `Funnel Tracking!G2:G`
+  - `Funnel Tracking!G2:G` (daily), `Funnel Tracking!K2:K` (cumulative)
 - Keep percent number formatting at `0.00%`.
 
 ## Native table ownership
@@ -203,7 +208,7 @@ Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
 
 ### Never use `sheets.append_rows(..., "'{Tab}'!A1")` with a native table
 
-Native Google Sheets tables declare a fixed row range (e.g. Job Ingestion `A1:J1000`, Mojo Apply `A1:O1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
+Native Google Sheets tables declare a fixed row range (e.g. Job Ingestion `A1:J1000`, Mojo Apply `A1:O1000`, Funnel Tracking `A1:K1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
 
 **Correct pattern:** use `find_or_next_row()` + `sheets.update_range()`:
 
@@ -211,6 +216,7 @@ Native Google Sheets tables declare a fixed row range (e.g. Job Ingestion `A1:J1
 target_row, _existing = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="J")
 sheets.update_range(f"'{TAB_JOB}'!A{target_row}:J{target_row}", [row_data])
 # Mojo Apply (15 cols): end_col="O", update_range through column O
+# Funnel Tracking (11 cols per stage row): find_funnel_block_start + update_range through column K
 ```
 
 ### Idempotent date-keyed writes

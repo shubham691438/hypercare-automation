@@ -322,7 +322,7 @@ One row per day. Date = yesterday (`HYPERCARE_REPORT_DATE`). Columns **A–H** a
 
 ### `Funnel Tracking`
 
-One block of rows per day (one row per Mojo stage), separated by a blank row. Date = yesterday.
+One block of rows per day (one row per Mojo stage), separated by a blank row. Date = yesterday (`HYPERCARE_REPORT_DATE`). Columns **A–G** are **per-stage values for that report day**; **H–K** are **cumulative** for the same stage key across all **prior** funnel rows in the sheet (through dates **before** the current report date), plus the current day — sums of **D, E, F** by `B` (stage key); **K** is **recomputed** from cumulative **I** vs **J**, not a sum of daily **G**.
 
 | Col | Meaning | Source |
 |-----|---------|--------|
@@ -332,7 +332,11 @@ One block of rows per day (one row per Mojo stage), separated by a blank row. Da
 | D | CRM Count - All | Tao DB |
 | E | CRM Count - Sponsored | Tao DB |
 | F | Mojo Count - Sponsored | Mojo publishers API |
-| G | Delta CRM Sponsored vs Mojo (%) | computed |
+| G | Delta CRM Sponsored vs Mojo (%) | computed (same rule as daily `abs(E−F)/E` when `E>0`, stored as ratio for `PERCENT`) |
+| H | Cum. CRM Count - All | computed (running sum of **D** per stage **B**) |
+| I | Cum. CRM Count - Sponsored | computed (running sum of **E** per stage **B**) |
+| J | Cum. Mojo Count - Sponsored | computed (running sum of **F** per stage **B**) |
+| K | Cum. Delta CRM Sponsored vs Mojo (%) | computed from cumulative **I** vs **J** |
 
 Stage mapping: setup `order=N` → `tthN` in the publishers API `tthStats`.
 
@@ -342,7 +346,7 @@ Stage mapping: setup `order=N` → `tthN` in the publishers API `tthStats`.
 
 | Column(s) | Green | Yellow | Red |
 |-----------|-------|--------|-----|
-| `Job Ingestion!F`, `Mojo Apply!D/H/K/O`, `Funnel Tracking!G` | ≤ 10% | 10–25% | > 25% |
+| `Job Ingestion!F`, `Mojo Apply!D/H/K/O`, `Funnel Tracking!G/K` | ≤ 10% | 10–25% | > 25% |
 | `Job Ingestion!G` (Unified − Tao %) | ≤ 0 | — | > 0 |
 | `Job Ingestion!H` and `I` (timestamps) | today | — | before today |
 | `Job Ingestion!J` (null mappings) | 0 | — | ≥ 1 |

@@ -58,7 +58,8 @@ _SHEET_STYLE: dict[str, dict[str, Any]] = {
         "header_rows": [],
         # A:Date  B:Mojo Stage  C:CRM Stage Mapping  D:CRM Count-All
         # E:CRM Count-Spons  F:Mojo Count-Spons  G:Delta
-        "column_pixels": [110, 160, 500, 130, 160, 160, 200],
+        # H:Cum D  I:Cum E  J:Cum F  K:Cum G
+        "column_pixels": [110, 160, 500, 130, 160, 160, 200, 130, 160, 160, 200],
         "wrap_columns": [2],  # C: CRM Stage Mapping — contains comma-separated stage names
     },
     TAB_WEBSITE: {
@@ -243,6 +244,13 @@ def apply_hypercare_formatting(client: SheetsClient) -> None:
             end_row=_DATA_END_ROW,
             col=6,
         )  # G2:G...
+        _apply_percent_threshold_formatting_range(
+            client,
+            titles[TAB_FUNNEL],
+            start_row=_DATA_START_ROW,
+            end_row=_DATA_END_ROW,
+            col=10,
+        )  # K2:K... Cum. Delta CRM Sponsored vs Mojo (%)
 
 
 # ---------------------------------------------------------------------------
