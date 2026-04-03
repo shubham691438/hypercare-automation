@@ -610,32 +610,13 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
 
     # Single header row; rows 2+ are append-only history.
     if TAB_JOB in titles:
-        client.update_range(
-            f"'{TAB_JOB}'!A1:I1",
-            [JOB_INGESTION_HEADERS],
-        )
-        client.update_range(
-            f"'{TAB_JOB}'!A2:I{TABLE_MAX_ROWS}",
-            [["" for _ in range(len(JOB_INGESTION_HEADERS))] for _ in range(TABLE_MAX_ROWS - 1)],
-        )
-        client.update_range(
-            f"'{TAB_JOB}'!J1:L2",
-            [["", "", ""], ["", "", ""]],
-        )
+        client.update_range(f"'{TAB_JOB}'!A1:I1", [JOB_INGESTION_HEADERS])
 
     if TAB_MOJO in titles:
         client.update_range(f"'{TAB_MOJO}'!A1:H1", [MOJO_APPLY_HEADERS])
-        client.update_range(
-            f"'{TAB_MOJO}'!A2:H{TABLE_MAX_ROWS}",
-            [["" for _ in range(len(MOJO_APPLY_HEADERS))] for _ in range(TABLE_MAX_ROWS - 1)],
-        )
 
     if TAB_FUNNEL in titles:
         client.update_range(f"'{TAB_FUNNEL}'!A1:G1", [FUNNEL_HEADERS])
-        client.update_range(
-            f"'{TAB_FUNNEL}'!A2:G{TABLE_MAX_ROWS}",
-            [["" for _ in range(len(FUNNEL_HEADERS))] for _ in range(TABLE_MAX_ROWS - 1)],
-        )
 
     if TAB_WEBSITE in titles:
         client.update_range(

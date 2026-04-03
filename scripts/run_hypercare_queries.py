@@ -98,6 +98,76 @@ def report_date_string() -> str:
     return (date.today() - timedelta(days=1)).isoformat()
 
 
+def _parse_date_loose(val: str) -> date | None:
+    """Try common date formats; return a date object or None."""
+    for fmt in ("%Y-%m-%d", "%-m/%-d/%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(val.strip(), fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
+def _dates_equal(a: str, b: str) -> bool:
+    """True if both strings represent the same calendar date."""
+    da, db = _parse_date_loose(a), _parse_date_loose(b)
+    if da is not None and db is not None:
+        return da == db
+    return a.strip().lower() == b.strip().lower()
+
+
+def find_or_next_row(
+    sheets: SheetsClient,
+    tab: str,
+    *,
+    date_val: str,
+    end_col: str,
+    max_scan: int = 1000,
+) -> tuple[int, bool]:
+    """Return (row_number, is_existing) for writing a dated row.
+
+    Scans column A (rows 2..max_scan+1) for an entry whose date matches
+    *date_val* (tolerant of M/D/YYYY vs YYYY-MM-DD differences).  If found,
+    returns that row number with is_existing=True so the caller can overwrite
+    in place.  Otherwise returns the row after the last data row.
+    Returns (2, False) when the tab is completely empty.
+    """
+    rows = sheets.get_range(f"'{tab}'!A2:{end_col}{max_scan + 1}")
+    last_data_row = 1
+    for i, row in enumerate(rows, start=2):
+        cell = str(row[0]).strip() if row else ""
+        if cell and _dates_equal(cell, date_val):
+            return i, True
+        if any(str(c).strip() for c in row):
+            last_data_row = i
+    return last_data_row + 1, False
+
+
+def find_funnel_block_start(
+    sheets: SheetsClient,
+    tab: str,
+    *,
+    date_val: str,
+    max_scan: int = 1000,
+) -> tuple[int, int]:
+    """Return (block_start_row, block_length) for a funnel date block, or (next_empty, 0)."""
+    rows = sheets.get_range(f"'{tab}'!A2:A{max_scan + 1}")
+    last_data_row = 1
+    block_start = None
+    block_len = 0
+    for i, row in enumerate(rows, start=2):
+        cell = str(row[0]).strip() if row else ""
+        if cell and _dates_equal(cell, date_val):
+            if block_start is None:
+                block_start = i
+            block_len += 1
+        if any(str(c).strip() for c in row):
+            last_data_row = i
+    if block_start is not None:
+        return block_start, block_len
+    return last_data_row + 1, 0
+
+
 def parse_a1(cell: str) -> tuple[str, int]:
     m = CELL_RE.match(cell.strip())
     if not m:
@@ -726,7 +796,9 @@ def main() -> None:
             registry_results.get("ji_unified_closed_latest", ""),
             registry_results.get("ji_mojo_tao_null_mapping", ""),
         ]
-        sheets.append_rows(f"'{TAB_JOB}'!A1", [job_row])
+        job_target, _job_exists = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="I")
+        col_end = idx_to_col(len(job_row))
+        sheets.update_range(f"'{TAB_JOB}'!A{job_target}:{col_end}{job_target}", [job_row])
 
     if TRACKER_MOJO_APPLY in active_trackers:
         mojo_api_value: object = sponsored_applies
@@ -745,7 +817,9 @@ def main() -> None:
                 registry_results.get("mojo_total_tao", ""),
             ),
         ]
-        sheets.append_rows(f"'{TAB_MOJO}'!A1", [mojo_row])
+        mojo_target, _mojo_exists = find_or_next_row(sheets, TAB_MOJO, date_val=rdate, end_col="H")
+        col_end_m = idx_to_col(len(mojo_row))
+        sheets.update_range(f"'{TAB_MOJO}'!A{mojo_target}:{col_end_m}{mojo_target}", [mojo_row])
 
     if TRACKER_FUNNEL_TRACKING in active_trackers:
         if funnel_crm_error:
@@ -760,7 +834,20 @@ def main() -> None:
                 crm_sponsored_counts,
             )
         if funnel_rows:
-            sheets.append_rows(f"'{TAB_FUNNEL}'!A1", funnel_rows)
+            funnel_start, existing_len = find_funnel_block_start(sheets, TAB_FUNNEL, date_val=rdate)
+            funnel_end_row = funnel_start + len(funnel_rows) - 1
+            sheets.update_range(
+                f"'{TAB_FUNNEL}'!A{funnel_start}:G{funnel_end_row}",
+                funnel_rows,
+            )
+            # If the new block is shorter than the old one, clear leftover rows
+            if existing_len > len(funnel_rows):
+                blank = [[""] * 7] * (existing_len - len(funnel_rows))
+                clear_start = funnel_start + len(funnel_rows)
+                sheets.update_range(
+                    f"'{TAB_FUNNEL}'!A{clear_start}:G{clear_start + len(blank) - 1}",
+                    blank,
+                )
 
     finished = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     update_overview_status(
