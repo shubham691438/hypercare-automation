@@ -285,18 +285,25 @@ One row per day. Date = today.
 
 ### `Mojo Apply`
 
-One row per day. Date = yesterday.
+One row per day. Date = yesterday (`HYPERCARE_REPORT_DATE`). Columns **A–H** are **daily** values; **I–O** are **cumulative** from the first Mojo Apply row in the sheet through the current report date (sums of **B, C, E, F, G**; **K** and **O** are **recomputed** from those cumulative totals, not a sum of daily percentages).
 
 | Col | Meaning | Source |
 |-----|---------|--------|
 | A | Date | yesterday |
 | B | Sponsored Applies on Mojo | Mojo publishers API |
 | C | Sponsored Applies in Tao | Tao DB |
-| D | Delta Mojo vs CRM (%) | computed |
+| D | Delta Mojo vs CRM (%) | computed (`abs(C−B)/B` as a ratio for `PERCENT` display) |
 | E | Total Applies in CRM | Tao DB |
 | F | CRM Creation Failed | Tao DB |
 | G | ATS Rejected | Tao DB |
-| H | ATS Rejected out of Total (%) | computed |
+| H | ATS Rejected out of Total Applies in CRM (%) | computed (`G/E` as a ratio) |
+| I | Cum. Sponsored Applies on Mojo | computed (running sum of **B**) |
+| J | Cum. Sponsored Applies in Tao | computed (running sum of **C**) |
+| K | Cum. Delta Mojo vs CRM (%) | computed from cumulative **J** vs **I** |
+| L | Cum. Total Applies in CRM | computed (running sum of **E**) |
+| M | Cum. CRM Creation Failed | computed (running sum of **F**) |
+| N | Cum. ATS Rejected | computed (running sum of **G**) |
+| O | Cum. ATS Rejected out of Total Applies in CRM (%) | computed from cumulative **N** vs **L** |
 
 ### `Funnel Tracking`
 
@@ -320,7 +327,7 @@ Stage mapping: setup `order=N` → `tthN` in the publishers API `tthStats`.
 
 | Column(s) | Green | Yellow | Red |
 |-----------|-------|--------|-----|
-| `Job Ingestion!F`, `Mojo Apply!D/H`, `Funnel Tracking!G` | ≤ 10% | 10–25% | > 25% |
+| `Job Ingestion!F`, `Mojo Apply!D/H/K/O`, `Funnel Tracking!G` | ≤ 10% | 10–25% | > 25% |
 | `Job Ingestion!G` (Unified − Tao %) | ≤ 0 | — | > 0 |
 | `Job Ingestion!H` and `I` (timestamps) | today | — | before today |
 | `Job Ingestion!J` (null mappings) | 0 | — | ≥ 1 |

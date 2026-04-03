@@ -40,6 +40,13 @@ MOJO_APPLY_HEADERS = [
     "CRM Creation Failed",
     "ATS Rejected",
     "ATS Rejected out of Total Applies in CRM (%)",
+    "Cum. Sponsored Applies on Mojo",
+    "Cum. Sponsored Applies in Tao",
+    "Cum. Delta Mojo vs CRM (%)",
+    "Cum. Total Applies in CRM",
+    "Cum. CRM Creation Failed",
+    "Cum. ATS Rejected",
+    "Cum. ATS Rejected out of Total Applies in CRM (%)",
 ]
 FUNNEL_HEADERS = [
     "Date",
@@ -148,13 +155,13 @@ def ensure_mojo_apply_native_table(client: SheetsClient) -> None:
             "startRowIndex": 0,
             "endRowIndex": TABLE_MAX_ROWS,
             "startColumnIndex": 0,
-            "endColumnIndex": 8,
+            "endColumnIndex": 15,
         },
         "columnProperties": [
             {
                 "columnIndex": i,
                 "columnName": name,
-                **({"columnType": "PERCENT"} if i in (3, 7) else {}),
+                **({"columnType": "PERCENT"} if i in (3, 7, 10, 14) else {}),
             }
             for i, name in enumerate(MOJO_APPLY_HEADERS)
         ],
@@ -287,7 +294,7 @@ def clear_mojo_apply_manual_header_format(client: SheetsClient) -> None:
                         "startRowIndex": 0,
                         "endRowIndex": 1,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 8,
+                        "endColumnIndex": 15,
                     },
                     "cell": {"userEnteredFormat": {}},
                     "fields": "userEnteredFormat(backgroundColor,textFormat,wrapStrategy,verticalAlignment)",
@@ -311,7 +318,7 @@ def clear_mojo_apply_extra_area_format(client: SheetsClient) -> None:
                         "sheetId": sid,
                         "startRowIndex": 0,
                         "endRowIndex": TABLE_MAX_ROWS,
-                        "startColumnIndex": 8,
+                        "startColumnIndex": 15,
                         "endColumnIndex": 26,
                     },
                     "cell": {"userEnteredFormat": {}},
@@ -615,7 +622,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
         client.update_range(f"'{TAB_JOB}'!A1:J1", [JOB_INGESTION_HEADERS])
 
     if TAB_MOJO in titles:
-        client.update_range(f"'{TAB_MOJO}'!A1:H1", [MOJO_APPLY_HEADERS])
+        client.update_range(f"'{TAB_MOJO}'!A1:O1", [MOJO_APPLY_HEADERS])
 
     if TAB_FUNNEL in titles:
         client.update_range(f"'{TAB_FUNNEL}'!A1:G1", [FUNNEL_HEADERS])
@@ -661,6 +668,6 @@ def bootstrap_hypercare_workbook(client: SheetsClient, *, overwrite: bool = Fals
     if TAB_JOB in titles:
         client.update_range(f"'{TAB_JOB}'!A1:J1", [JOB_INGESTION_HEADERS])
     if TAB_MOJO in titles:
-        client.update_range(f"'{TAB_MOJO}'!A1:H1", [MOJO_APPLY_HEADERS])
+        client.update_range(f"'{TAB_MOJO}'!A1:O1", [MOJO_APPLY_HEADERS])
     if TAB_FUNNEL in titles:
         client.update_range(f"'{TAB_FUNNEL}'!A1:G1", [FUNNEL_HEADERS])

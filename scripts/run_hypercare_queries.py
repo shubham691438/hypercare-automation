@@ -876,7 +876,59 @@ def main() -> None:
                 registry_results.get("mojo_total_tao", ""),
             ),
         ]
-        mojo_target, _mojo_exists = find_or_next_row(sheets, TAB_MOJO, date_val=rdate, end_col="H")
+
+        # --- Cumulative columns (I–O): sum of daily values from hypercare start to current date ---
+        # Mojo Apply dates start at go_live_date - 1 (report_date convention).
+        # Read ALL existing rows including the one we're about to write/update,
+        # then sum everything up to and including rdate.
+        existing_rows = sheets.get_range(f"'{TAB_MOJO}'!A2:O{1000}")
+        # Columns to sum: B(1) C(2) E(4) F(5) G(6) — indices within each row
+        _SUM_COLS = [1, 2, 4, 5, 6]
+        cum_sums = {c: 0.0 for c in _SUM_COLS}
+        rdate_parsed = _parse_date_loose(rdate)
+        for erow in existing_rows:
+            if not erow or not str(erow[0]).strip():
+                continue
+            row_date = _parse_date_loose(str(erow[0]).strip())
+            if row_date is None:
+                continue
+            # Skip the current date row — we'll add today's fresh values below
+            if _dates_equal(str(erow[0]), rdate):
+                continue
+            # Only include rows up to (but not including) current date
+            if rdate_parsed is not None and row_date > rdate_parsed:
+                continue
+            for c in _SUM_COLS:
+                if c < len(erow):
+                    v = to_number(erow[c])
+                    if v is not None:
+                        cum_sums[c] += v
+        # Add current day's values from the row we just built
+        for c in _SUM_COLS:
+            v = to_number(mojo_row[c])
+            if v is not None:
+                cum_sums[c] += v
+
+        cum_sponsored_mojo = cum_sums[1]
+        cum_sponsored_tao = cum_sums[2]
+        cum_total_crm = cum_sums[4]
+        cum_crm_failed = cum_sums[5]
+        cum_ats_rejected = cum_sums[6]
+        # Recompute percentages from cumulative sums (not sum of daily %)
+        cum_delta_pct = percent_delta(cum_sponsored_tao, cum_sponsored_mojo)
+        cum_rejected_pct = ratio(cum_ats_rejected, cum_total_crm)
+
+        mojo_row.extend([
+            format_metric_value(int(cum_sponsored_mojo)),
+            format_metric_value(int(cum_sponsored_tao)),
+            cum_delta_pct,
+            format_metric_value(int(cum_total_crm)),
+            format_metric_value(int(cum_crm_failed)),
+            format_metric_value(int(cum_ats_rejected)),
+            cum_rejected_pct,
+        ])
+
+        mojo_target, _mojo_exists = find_or_next_row(sheets, TAB_MOJO, date_val=rdate, end_col="O")
         col_end_m = idx_to_col(len(mojo_row))
         sheets.update_range(f"'{TAB_MOJO}'!A{mojo_target}:{col_end_m}{mojo_target}", [mojo_row])
 

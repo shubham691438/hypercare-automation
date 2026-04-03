@@ -50,7 +50,8 @@ _SHEET_STYLE: dict[str, dict[str, Any]] = {
         # A:Date  B:Sponsored Applies on Mojo  C:Sponsored Applies in Tao
         # D:Delta Mojo vs CRM (%)  E:Total Applies in CRM  F:CRM Creation Failed
         # G:ATS Rejected  H:ATS Rejected out of Total Applies in CRM (%)
-        "column_pixels": [110, 230, 220, 210, 190, 190, 170, 280],
+        # I:Cum B  J:Cum C  K:Cum D  L:Cum E  M:Cum F  N:Cum G  O:Cum H
+        "column_pixels": [110, 230, 220, 210, 190, 190, 170, 280, 230, 220, 210, 190, 190, 170, 280],
     },
     TAB_FUNNEL: {
         "frozen_row_count": 1,
@@ -198,6 +199,20 @@ def apply_hypercare_formatting(client: SheetsClient) -> None:
             end_row=_DATA_END_ROW,
             col=7,
         )  # H2:H...
+        _apply_percent_threshold_formatting_range(
+            client,
+            titles[TAB_MOJO],
+            start_row=_DATA_START_ROW,
+            end_row=_DATA_END_ROW,
+            col=10,
+        )  # K2:K... Cum. Delta Mojo vs CRM (%)
+        _apply_percent_threshold_formatting_range(
+            client,
+            titles[TAB_MOJO],
+            start_row=_DATA_START_ROW,
+            end_row=_DATA_END_ROW,
+            col=14,
+        )  # O2:O... Cum. ATS Rejected out of Total (%)
     if TAB_FUNNEL in titles:
         _apply_percent_threshold_formatting_range(
             client,

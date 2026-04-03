@@ -51,7 +51,7 @@ def main() -> None:
     job_rows = c.get_range(f"'{TAB_JOB}'!A2:J1000")
     print(f"{TAB_JOB} latest row:", last_nonempty_row(job_rows))
     print()
-    mojo_rows = c.get_range(f"'{TAB_MOJO}'!A2:H1000")
+    mojo_rows = c.get_range(f"'{TAB_MOJO}'!A2:O1000")
     print(f"{TAB_MOJO} latest row:", last_nonempty_row(mojo_rows))
     print()
     funnel_rows = c.get_range(f"'{TAB_FUNNEL}'!A2:G1000")

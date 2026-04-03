@@ -100,18 +100,23 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
 
 ## Mojo Apply layout
 
-- `Mojo Apply` is a native Google Sheets table named `MojoApply`.
-- Row `1` is the header row. Rows `2+` are append-only daily history.
-- Current layout:
+- `Mojo Apply` is a native Google Sheets table named `MojoApply` (**15** columns `A:O`).
+- Row `1` is the header row. Rows `2+` are append-only daily history (one row per `HYPERCARE_REPORT_DATE`).
+- **Daily block `A:H`:**
   - `A` date
-  - `B` sponsored applies on Mojo
-  - `C` sponsored applies in Tao
-  - `D` delta Mojo vs CRM (%)
-  - `E` total applies in CRM
-  - `F` CRM creation failed
-  - `G` ATS rejected
-  - `H` ATS rejected out of total applies in CRM (%)
-- `B` is Mojo API driven; `C/E/F/G` are Tao SQL; `D/H` are computed in Python during append.
+  - `B` sponsored applies on Mojo (Mojo publishers API)
+  - `C` sponsored applies in Tao (Query registry / Tao SQL)
+  - `D` delta Mojo vs CRM (%) — computed in Python (`percent_delta` vs `B`)
+  - `E` total applies in CRM (Tao SQL)
+  - `F` CRM creation failed (Tao SQL)
+  - `G` ATS rejected (Tao SQL)
+  - `H` ATS rejected out of total applies in CRM (%) — computed (`ratio` `G` vs `E`)
+- **Cumulative block `I:O`** (hypercare window totals through the report date):
+  - `I`–`J` cumulative sponsored applies (Mojo / Tao); `K` cumulative delta Mojo vs CRM (%) — recomputed from cumulative `I`/`J`, **not** a sum of daily `D`
+  - `L`–`N` cumulative total applies / CRM failed / ATS rejected (sums of `E`/`F`/`G`)
+  - `O` cumulative ATS-rejected % — recomputed from cumulative `N`/`L`, **not** a sum of daily `H`
+- Runner reads prior `Mojo Apply` rows via `A2:O1000`, skips the current date row when summing, then extends `mojo_row` with cumulative fields. `find_or_next_row(..., end_col="O")`.
+- If changing this layout, update together: `MOJO_APPLY_HEADERS` + native table in `hypercare_bootstrap.py`, `mojo_row` / cumulative logic in `run_hypercare_queries.py`, `hypercare_formatting.py` (widths + percent CF on `D`, `H`, `K`, `O`), `clear_mojo_apply_*` column spans, `verify_hypercare_sheet.py` read range.
 
 ## Funnel Tracking layout
 
@@ -154,8 +159,8 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
   - red: `> 25%`
 - Current percent fields:
   - `Job Ingestion!F2:F`
-  - `Mojo Apply!D2:D`
-  - `Mojo Apply!H2:H`
+  - `Mojo Apply!D2:D`, `Mojo Apply!H2:H` (daily)
+  - `Mojo Apply!K2:K`, `Mojo Apply!O2:O` (cumulative)
   - `Funnel Tracking!G2:G`
 - Keep percent number formatting at `0.00%`.
 
@@ -201,13 +206,14 @@ Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
 
 ### Never use `sheets.append_rows(..., "'{Tab}'!A1")` with a native table
 
-Native Google Sheets tables declare a fixed row range (e.g. `A1:J1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
+Native Google Sheets tables declare a fixed row range (e.g. Job Ingestion `A1:J1000`, Mojo Apply `A1:O1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
 
 **Correct pattern:** use `find_or_next_row()` + `sheets.update_range()`:
 
 ```python
-target_row, _existing = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="I")
+target_row, _existing = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="J")
 sheets.update_range(f"'{TAB_JOB}'!A{target_row}:J{target_row}", [row_data])
+# Mojo Apply (15 cols): end_col="O", update_range through column O
 ```
 
 ### Idempotent date-keyed writes
