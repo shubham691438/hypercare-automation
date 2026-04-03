@@ -11,12 +11,37 @@ There are three tiers. Never mix them.
 
 | Tier | File | Contents |
 |------|------|----------|
-| **Secrets** | `.env` | Passwords, tokens, service-account path — one flat file, gitignored |
+| **Secrets** | `.env` | 10 vars only — see table below. Gitignored. |
 | **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, hypercare days, enabled trackers, DB IDs, Mojo IDs, ATS provider key — gitignored except `example.json` |
-| **Per-ATS** | `config/ats/<provider>/<client>.json` | Public URLs and other non-secret per-client ATS config — safe to commit |
+| **Per-ATS** | `config/ats/<provider>/<client>.json` | Public ATS job-board URL — safe to commit |
+
+### `.env` required variables (exactly these 10, nothing more)
+
+| Variable | What it holds |
+|---|---|
+| `HYPERCARE_CLIENT` | Active client ID → selects `config/clients/<id>.json` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Filename of GCP service-account JSON (in project root) |
+| `UNIFIED_DB_HOST` | Unified DB host |
+| `UNIFIED_DB_USER` | Unified DB read-only user |
+| `UNIFIED_DB_PASSWORD` | Unified DB password |
+| `TAO_DB_HOST` | Tao DB host |
+| `TAO_DB_USER` | Tao DB user |
+| `TAO_DB_PASSWORD` | Tao DB password |
+| `MOJO_ACCESS_TOKEN` | Short-lived Cognito JWT (~2 h) from `mojopro.joveo.com` |
+| `MOJO_EMAIL` | Your Joveo email — also sent as the Mojo API username |
+
+Everything else has a built-in default or is loaded from the client JSON:
+- `UNIFIED_DB_NAME` / `TAO_DB_NAME` — default `unified_datastore` / `tao_db` (in `db_readonly.py`)
+- `UNIFIED_DB_PORT` / `TAO_DB_PORT` — default `5432`
+- `MOJO_BASE_URL` — hardcoded `https://mojopro.joveo.com` (in `mojo_jobs.py`)
+- `MOJO_USERNAME` — defaults to `MOJO_EMAIL`
+- `MOJO_ACCOUNT_ID`, `MOJO_AGENCY_ID`, `MOJO_CLIENT_ID`, `MOJO_JOBS_PATH` — loaded from client JSON by `set_client_runtime_defaults()`
+- Spreadsheet ID — loaded from `config/clients/<id>.json → spreadsheet_id`
+
+Do not add new env vars unless they are genuinely secret and cannot be derived from client config or a sensible default.
 
 - Never put tokens or passwords in JSON config files.
-- Prefer client config for per-client IDs and settings. The client JSON is the onboarding contract and must include `go_live_date`, `hypercare_days`, and `enabled_tabs`.
+- The client JSON is the onboarding contract and must include `go_live_date`, `hypercare_days`, and `enabled_tabs`.
 
 ## Key modules — use these, don't bypass them
 

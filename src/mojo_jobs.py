@@ -40,8 +40,11 @@ def _mojo_query_date() -> str:
     return _dt.date.today().isoformat()
 
 
+_MOJO_BASE_URL = "https://mojopro.joveo.com"
+
+
 def _mojo_common_config() -> Dict[str, str]:
-    base = _env_required("MOJO_BASE_URL")
+    base = os.environ.get("MOJO_BASE_URL", _MOJO_BASE_URL).strip() or _MOJO_BASE_URL
     access_token = _env_required("MOJO_ACCESS_TOKEN")
     account_id = _env_required("MOJO_ACCOUNT_ID")
     agency_id = _env_required("MOJO_AGENCY_ID")

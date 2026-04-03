@@ -150,7 +150,17 @@ def find_funnel_block_start(
     date_val: str,
     max_scan: int = 1000,
 ) -> tuple[int, int]:
-    """Return (block_start_row, block_length) for a funnel date block, or (next_empty, 0)."""
+    """Return (block_start_row, block_length) for a funnel date block.
+
+    For an **existing** date: returns (first_matching_row, number_of_matching_rows).
+    For a **new** date with existing data above: returns (last_data_row + 2, 0) so
+    that the caller can write a blank separator at last_data_row + 1 then stage rows
+    starting at last_data_row + 2.
+    For a completely empty tab: returns (2, 0) — no separator needed.
+
+    Blank separator rows (empty column A) are skipped when tracking last_data_row,
+    so they never push the separator offset.
+    """
     rows = sheets.get_range(f"'{tab}'!A2:A{max_scan + 1}")
     last_data_row = 1
     block_start = None
@@ -161,11 +171,14 @@ def find_funnel_block_start(
             if block_start is None:
                 block_start = i
             block_len += 1
-        if any(str(c).strip() for c in row):
+        if cell:  # only non-blank rows count as "data"
             last_data_row = i
     if block_start is not None:
         return block_start, block_len
-    return last_data_row + 1, 0
+    # New date: reserve a blank separator row if there is existing data above
+    if last_data_row > 1:
+        return last_data_row + 2, 0  # blank at last_data_row+1, data at last_data_row+2
+    return 2, 0  # empty tab — start directly at row 2, no separator
 
 
 def parse_a1(cell: str) -> tuple[str, int]:
@@ -835,12 +848,19 @@ def main() -> None:
             )
         if funnel_rows:
             funnel_start, existing_len = find_funnel_block_start(sheets, TAB_FUNNEL, date_val=rdate)
+            # Write blank separator row for new date blocks (funnel_start > 2 means
+            # there is existing data above; the blank goes at funnel_start - 1)
+            if existing_len == 0 and funnel_start > 2:
+                sheets.update_range(
+                    f"'{TAB_FUNNEL}'!A{funnel_start - 1}:G{funnel_start - 1}",
+                    [[""] * 7],
+                )
             funnel_end_row = funnel_start + len(funnel_rows) - 1
             sheets.update_range(
                 f"'{TAB_FUNNEL}'!A{funnel_start}:G{funnel_end_row}",
                 funnel_rows,
             )
-            # If the new block is shorter than the old one, clear leftover rows
+            # If the re-run block is shorter than the stored one, clear leftover rows
             if existing_len > len(funnel_rows):
                 blank = [[""] * 7] * (existing_len - len(funnel_rows))
                 clear_start = funnel_start + len(funnel_rows)

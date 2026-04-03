@@ -1,39 +1,44 @@
 {
-  "id": "clientname",
-  "name": "Human-readable client name",
-  "spreadsheet_id": "GOOGLE_SHEET_ID_HERE",
-  "go_live_date": "2026-04-01",
+  "_comment": "Copy this file to config/clients/<your-client-id>.json and fill in every field.",
+
+  "id": "myclient",
+  "name": "My Client Full Name",
+
+  "spreadsheet_id": "PASTE_GOOGLE_SHEET_ID_HERE",
+
+  "go_live_date": "YYYY-MM-DD",
   "hypercare_days": 10,
+
   "enabled_tabs": [
     "job_ingestion",
     "mojo_apply",
     "funnel_tracking"
   ],
-  "owner": "owner@example.com",
+
+  "owner": "owner@joveo.com",
   "client_contacts": [
-    "stakeholder1@example.com",
-    "stakeholder2@example.com"
+    "stakeholder@client.com"
   ],
 
   "ats": {
     "provider": "ukg",
-    "client_key": "clientname"
+    "client_key": "myclient"
   },
 
   "mojo": {
-    "account_id": "mojo-account-id",
-    "agency_id": "mojo-agency-id",
-    "client_id": "mojo-client-uuid",
-    "jobs_path": "/fna-dashboard/v1/agencies/<agency>/jobs?page-type=CLIENT_JOBS"
+    "account_id": "MOJO_ACCOUNT_ID",
+    "agency_id": "MOJO_AGENCY_ID",
+    "client_id": "MOJO_CLIENT_UUID",
+    "jobs_path": "/fna-dashboard/v1/agencies/MOJO_AGENCY_ID/jobs?page-type=CLIENT_JOBS"
   },
 
   "db": {
     "unified": {
-      "customer_id": "unified-db-customer-uuid"
+      "customer_id": "UNIFIED_CUSTOMER_ID"
     },
     "tao": {
-      "source_id": "tao-source-id",
-      "client_id": "tao-client-id"
+      "source_id": "TAO_SOURCE_ID",
+      "client_id": "TAO_CLIENT_ID"
     }
   }
 }

@@ -13,6 +13,8 @@ token.json
 *-credentials.json
 service-account*.json
 hypercare-automation-*.json
+# Any *.json file at the project root (service-account key downloads land here)
+/*.json
 
 # Per-client configs contain spreadsheet IDs (may be sensitive) — commit example only
 config/clients/*.json

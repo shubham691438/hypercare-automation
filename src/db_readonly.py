@@ -54,6 +54,11 @@ class PostgresConfig:
 
     @classmethod
     def from_env(cls, prefix: str) -> PostgresConfig:
+        _DB_NAME_DEFAULTS = {
+            "UNIFIED_DB": "unified_datastore",
+            "TAO_DB": "tao_db",
+        }
+
         def _req(name: str) -> str:
             v = os.environ.get(name)
             if not v or not str(v).strip():
@@ -61,10 +66,13 @@ class PostgresConfig:
             return str(v).strip()
 
         port_raw = os.environ.get(f"{prefix}_PORT", "5432")
+        db_name = os.environ.get(f"{prefix}_NAME", _DB_NAME_DEFAULTS.get(prefix, ""))
+        if not db_name:
+            raise OSError(f"Missing required environment variable: {prefix}_NAME")
         return cls(
             host=_req(f"{prefix}_HOST"),
             port=int(port_raw),
-            database=_req(f"{prefix}_NAME"),
+            database=db_name,
             user=_req(f"{prefix}_USER"),
             password=_req(f"{prefix}_PASSWORD"),
         )
