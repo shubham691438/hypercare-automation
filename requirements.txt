@@ -4,3 +4,5 @@ google-auth-httplib2>=0.2.0
 psycopg2-binary>=2.9.9
 sqlparse>=0.5.0
 requests>=2.32.0
+flask>=3.0.0
+flask-cors>=4.0.0
