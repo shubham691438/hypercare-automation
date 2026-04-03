@@ -332,6 +332,14 @@ def to_number(value: object) -> float | None:
         return None
 
 
+def _format_ratio_for_percent_cell(ratio: float) -> str:
+    """Stable decimal string for PERCENT-formatted cells (no scientific notation)."""
+    if not ratio:
+        return "0"
+    text = f"{ratio:.12f}".rstrip("0").rstrip(".")
+    return text if text else "0"
+
+
 def format_metric_value(value: object) -> str:
     if value is None:
         return ""
@@ -356,13 +364,37 @@ def percent_delta(numerator: object, denominator: object) -> str:
     return str(abs(num - den) / den)
 
 
-def percent_unified_minus_tao_over_unified(unified: object, tao: object) -> str:
-    """(Unified − Tao) / Unified as a fraction for PERCENT cell format (same as *100 in percent terms)."""
-    u = to_number(unified)
-    t = to_number(tao)
-    if u is None or u == 0 or t is None:
+def percent_unified_minus_tao_over_unified(
+    open_jobs_unified_db: object,
+    open_jobs_tao_db: object,
+) -> str:
+    """Value for Job Ingestion column *Delta Unified − Tao (%)*.
+
+    Formula (same as header labels in ``JOB_INGESTION_HEADERS``)::
+
+        ((Open Jobs in Unified DB − Open Jobs in Tao DB) / Open Jobs in Unified DB) × 100
+
+    In code, ``open_jobs_unified_db`` / ``open_jobs_tao_db`` are the query scalars
+    ``ji_unified_open`` / ``ji_tao_open`` (same numbers written to columns C and D).
+
+    We write only the **ratio** ``(unified − tao) / unified``; conditional formatting
+    and the sheet's ``PERCENT`` (``0.00%``) format handle the ×100 display, like Excel.
+
+    Counts are rounded to whole jobs before the ratio so tiny float noise (or drivers
+    returning ``564.0`` vs ``563.999…``) does not explode the percentage. If column G
+    still shows millions of percent, clear any manual formula there (e.g. ``=C2/(C2-D2)``
+    inverts the ratio when the difference is near zero).
+    """
+    u = to_number(open_jobs_unified_db)
+    t = to_number(open_jobs_tao_db)
+    if u is None or t is None:
         return ""
-    return str((u - t) / u)
+    u_i = int(round(u))
+    t_i = int(round(t))
+    if u_i <= 0:
+        return ""
+    ratio_unified_tao = (u_i - t_i) / u_i
+    return _format_ratio_for_percent_cell(ratio_unified_tao)
 
 
 def ratio(value: object, total: object) -> str:
@@ -814,9 +846,10 @@ def main() -> None:
             registry_results.get("ji_tao_open", ""),
             format_metric_value(open_count if mojo_open_error == "" else f"ERROR: {mojo_open_error}"),
             percent_delta(open_count, website_open),
-            percent_unified_minus_tao_over_unified(
-                registry_results.get("ji_unified_open", ""),
+            # Delta Unified − Tao (%): abs(Tao − Unified) / Unified — same as ATS−Mojo logic
+            percent_delta(
                 registry_results.get("ji_tao_open", ""),
+                registry_results.get("ji_unified_open", ""),
             ),
             registry_results.get("ji_unified_open_latest", ""),
             registry_results.get("ji_unified_closed_latest", ""),
