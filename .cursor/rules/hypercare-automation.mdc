@@ -12,8 +12,7 @@ There are three tiers. Never mix them.
 | Tier | File | Contents |
 |------|------|----------|
 | **Secrets** | `.env` | 10 vars only — see table below. Gitignored. |
-| **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, hypercare days, enabled trackers, DB IDs, Mojo IDs, ATS provider key — gitignored except `example.json` |
-| **Per-ATS** | `config/ats/<provider>/<client>.json` | Public ATS job-board URL — safe to commit |
+| **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, hypercare days, enabled trackers, DB IDs, Mojo IDs, ATS config (provider + URL) — gitignored except `example.json` |
 
 ### `.env` required variables (exactly these 10, nothing more)
 
@@ -54,7 +53,7 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
 - `mojo_jobs.fetch_open_jobs_metrics()` → Mojo open-job count + latest startDate
 - `mojo_jobs.fetch_sponsored_applies()` → Mojo publishers applies count
 - `mojo_jobs.fetch_sponsored_stage_counts()` → Mojo funnel stage setup + `tthStats`
-- `ats.base.fetch_website_open_jobs(provider, client_key)` → ATS website count
+- `ats.base.fetch_website_open_jobs(provider?)` → ATS website open-job count (URL loaded from `ATS_URL` env var, set from `client_cfg["ats"]["url"]`)
 
 ## Database safety — never weaken
 
@@ -180,21 +179,19 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
 To add a new ATS provider, follow this checklist exactly:
 
 1. `src/ats/<provider>/__init__.py` (empty)
-2. `src/ats/<provider>/jobs.py` with `fetch_open_jobs(client_key: str) -> int`
-3. `config/ats/<provider>/example.json` (minimum non-secret request template)
-4. `config/ats/<provider>/<client>.json` (per-client non-secret config)
-5. Add routing in `src/ats/base.py → _dispatch()`
+2. `src/ats/<provider>/jobs.py` — implement `fetch_open_jobs() -> int` (reads `ATS_URL` env var)
+3. Add routing in `src/ats/base.py → _dispatch()`
+5. Add `ats.provider` and `ats.url` to `config/clients/<id>.json` for each client
 6. Document new env vars in `env.example` only if the provider truly needs them
 
 Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
 
 ## New client checklist
 
-1. `config/clients/<id>.json` — copy from `example.json`
-2. `config/ats/<provider>/<id>.json` — copy from provider `example.json`
-3. Fill in `go_live_date`, `hypercare_days`, and `enabled_tabs`
-4. `HYPERCARE_CLIENT=<id>` in `.env`
-5. Run bootstrap, then run the main script
+1. `config/clients/<id>.json` — copy from `example.json`, fill in all fields including `ats.url`
+2. Fill in `go_live_date`, `hypercare_days`, and `enabled_tabs`
+3. `HYPERCARE_CLIENT=<id>` in `.env`
+4. Run bootstrap, then run the main script
 
 ## Multi-client operations
 

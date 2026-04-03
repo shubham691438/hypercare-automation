@@ -307,7 +307,7 @@ def set_client_runtime_defaults(client_cfg: dict[str, Any]) -> None:
     ats_cfg = client_cfg.get("ats") or {}
     mojo_cfg = client_cfg.get("mojo") or {}
     os.environ.setdefault("ATS_PROVIDER", str(ats_cfg.get("provider") or ""))
-    os.environ.setdefault("ATS_CLIENT", str(ats_cfg.get("client_key") or ""))
+    os.environ.setdefault("ATS_URL", str(ats_cfg.get("url") or ""))
     os.environ.setdefault("MOJO_ACCOUNT_ID", str(mojo_cfg.get("account_id") or ""))
     os.environ.setdefault("MOJO_AGENCY_ID", str(mojo_cfg.get("agency_id") or ""))
     os.environ.setdefault("MOJO_CLIENT_ID", str(mojo_cfg.get("client_id") or ""))
@@ -587,7 +587,6 @@ def main() -> None:
                 "website_open_jobs",
                 e,
                 provider=os.environ.get("ATS_PROVIDER", ""),
-                client=os.environ.get("ATS_CLIENT", ""),
             )
             append_run_log(
                 sheets,

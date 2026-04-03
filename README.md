@@ -68,29 +68,15 @@ Open `config/clients/myclient.json` and replace every placeholder:
 | `id` | Same as the filename without `.json` (e.g. `myclient`) |
 | `spreadsheet_id` | ID from the Google Sheet URL (`/spreadsheets/d/<ID>/edit`) |
 | `go_live_date` | Client go-live date in `YYYY-MM-DD` |
+| `ats.provider` | ATS provider key, e.g. `ukg` |
+| `ats.url` | ATS job-board endpoint URL (from network tab / page source) |
 | `mojo.account_id` / `agency_id` | From Mojo URL: `mojopro.joveo.com/<agency_id>/...` |
 | `mojo.client_id` | UUID from Mojo URL: `.../clients/<uuid>/...` |
 | `mojo.jobs_path` | `/fna-dashboard/v1/agencies/<agency_id>/jobs?page-type=CLIENT_JOBS` |
 | `db.unified.customer_id` | `customer_id` used in Unified DB queries |
 | `db.tao.source_id` / `client_id` | IDs used in Tao DB queries |
 
-### Step 5 — Create `config/ats/ukg/<id>.json`  *(UKG clients only)*
-
-```bash
-cp config/ats/ukg/example.json config/ats/ukg/myclient.json
-```
-
-Replace the URL with the client's UKG job board URL:
-
-```json
-{
-  "url": "https://recruiting2.ultipro.com/<CLIENT_CODE>/JobBoard/<BOARD_UUID>/JobBoardView/LoadSearchResults"
-}
-```
-
-> For a non-UKG ATS see [Adding a new ATS provider](#adding-a-new-ats-provider).
-
-### Step 6 — Bootstrap the spreadsheet
+### Step 5 — Bootstrap the spreadsheet
 
 Creates tabs, headers, the Query registry, and native Sheets tables.
 
@@ -98,7 +84,7 @@ Creates tabs, headers, the Query registry, and native Sheets tables.
 PYTHONPATH=src .venv/bin/python scripts/bootstrap_hypercare_workbook.py
 ```
 
-### Step 7 — Run
+### Step 6 — Run
 
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/run_hypercare_queries.py
@@ -114,15 +100,13 @@ Open the Google Sheet — you should see data in row 2 of each enabled tab.
 Hypercare-Automation/
 ├── env.example                   ← template; copy to .env
 ├── config/
-│   ├── clients/
-│   │   └── example.json          ← template; copy to <id>.json (gitignored)
-│   └── ats/
-│       └── ukg/
-│           └── example.json      ← template; copy to <id>.json
+│   └── clients/
+│       └── example.json          ← template; copy to <id>.json (gitignored)
 ├── src/
 │   ├── ats/
 │   │   ├── base.py
-│   │   └── ukg/jobs.py
+│   │   └── ukg/
+│   │       └── jobs.py           ← open-job count
 │   ├── client_config.py
 │   ├── db_readonly.py
 │   ├── google_sheets_auth.py
@@ -157,8 +141,7 @@ Three tiers, strictly separated — never put secrets in JSON, never put client 
 | Tier | File | Contents |
 |------|------|----------|
 | **Secrets** | `.env` | 10 vars: DB creds, GCP key filename, Mojo token + email |
-| **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, enabled trackers, DB/Mojo/ATS IDs |
-| **Per-ATS** | `config/ats/<provider>/<id>.json` | Public ATS job-board URL — safe to commit |
+| **Per-client** | `config/clients/<id>.json` | Sheet ID, go-live date, enabled trackers, DB/Mojo/ATS config (including URL) |
 
 ### `config/clients/<id>.json` reference
 
@@ -172,7 +155,7 @@ Three tiers, strictly separated — never put secrets in JSON, never put client 
   "enabled_tabs": ["job_ingestion", "mojo_apply", "funnel_tracking"],
   "owner": "owner@joveo.com",
   "client_contacts": ["stakeholder@client.com"],
-  "ats": { "provider": "ukg", "client_key": "myclient" },
+  "ats": { "provider": "ukg", "url": "https://recruiting2.ultipro.com/..." },
   "mojo": {
     "account_id": "...", "agency_id": "...",
     "client_id": "...", "jobs_path": "..."
@@ -365,16 +348,22 @@ print(json.loads(base64.urlsafe_b64decode(p))['productId'])
 
 ## ATS API notes
 
-For UKG: the request body is hardcoded in `src/ats/ukg/jobs.py`. Only the URL lives in `config/ats/ukg/<client>.json`. No cookies or authentication headers are required.
+ATS config lives entirely in `config/clients/<id>.json → ats`. No separate per-ATS config files.
+
+For UKG: the request body is hardcoded in `src/ats/ukg/jobs.py`. The URL comes from `ats.url` in
+the client config. No cookies or authentication headers are required.
+
+Available ATS scripts (UKG):
+- `src/ats/ukg/jobs.py` — `fetch_open_jobs()`
 
 ---
 
 ## Adding a new client
 
-1. `cp config/clients/example.json config/clients/<id>.json` — fill in all fields
-2. `cp config/ats/ukg/example.json config/ats/ukg/<id>.json` — fill in the ATS URL
-3. Set `HYPERCARE_CLIENT=<id>` in `.env`
-4. Bootstrap → run
+1. `cp config/clients/example.json config/clients/<id>.json` — fill in all fields,
+   including `ats.url` for the ATS job-board endpoint
+2. Set `HYPERCARE_CLIENT=<id>` in `.env`
+3. Bootstrap → run
 
 Or use the scaffold script:
 ```bash
@@ -386,9 +375,9 @@ PYTHONPATH=src .venv/bin/python scripts/create_client.py --client-id <id> --name
 ## Adding a new ATS provider
 
 1. `src/ats/<provider>/__init__.py` (empty)
-2. `src/ats/<provider>/jobs.py` — implement `fetch_open_jobs(client_key: str) -> int`
-3. `config/ats/<provider>/example.json` — minimal non-secret config template
-4. Register in `src/ats/base.py → _dispatch()`
+2. `src/ats/<provider>/jobs.py` — implement `fetch_open_jobs() -> int` (reads `ATS_URL` env var)
+3. Register in `src/ats/base.py → _dispatch()`
+4. Add `ats.url` to `config/clients/<id>.json` for each client using that provider
 
 ---
 

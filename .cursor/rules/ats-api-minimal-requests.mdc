@@ -1,6 +1,6 @@
 ---
 description: ATS API integration — minimum requests, minimum config per client
-globs: src/ats/**/*.py, config/ats/**/*.json
+globs: src/ats/**/*.py
 alwaysApply: false
 ---
 
@@ -18,33 +18,55 @@ resp = requests.post(url, headers={"Content-Type": "application/json"}, json=bod
 resp = requests.post(url, headers={"cookie": "...", "origin": "...", ...}, json=body)
 ```
 
-## 2. Minimum config per client
+## 2. ATS config lives in the client config — no separate ATS config files
 
-Only store what **changes between clients** in `config/ats/<provider>/<client>.json`. Everything constant across all clients of the same provider belongs in code.
+All ATS configuration belongs in `config/clients/<id>.json → ats`:
 
-| Put in config file | Hardcode in `jobs.py` |
-|--------------------|-----------------------|
-| URL (differs per client) | Request body (same for all UKG clients) |
-| Client-specific IDs | Common filters / pagination defaults |
-
-UKG example — config file is just one line:
 ```json
-{ "url": "https://recruiting2.ultipro.com/..." }
+{
+  "ats": {
+    "provider": "ukg",
+    "url": "https://recruiting2.ultipro.com/<CLIENT_CODE>/JobBoard/<UUID>/JobBoardView/LoadSearchResults"
+  }
+}
 ```
 
-Current UKG convention in this project:
-- URL stays in `config/ats/ukg/<client>.json`
-- request body stays hardcoded in `src/ats/ukg/jobs.py`
-- do not move short-lived tokens, cookies, or copied browser headers into config
+`set_client_runtime_defaults()` in `run_hypercare_queries.py` loads `ats.url` into `ATS_URL` and `ats.provider` into `ATS_PROVIDER`. ATS scripts read these from env — they do not open config files.
 
-## 3. Verify unauthenticated access first
+There is **no** `config/ats/` directory. Do not create one.
+
+| Put in `config/clients/<id>.json → ats` | Hardcode in `jobs.py` |
+|------------------------------------------|-----------------------|
+| `url` (differs per client) | Request body (same for all UKG clients) |
+| `provider` | Common filters / pagination defaults |
+
+## 3. ATS script structure
+
+Each provider has its own package under `src/ats/<provider>/`:
+
+```
+src/ats/
+├── base.py                  ← dispatcher, routes by ATS_PROVIDER
+└── ukg/
+    ├── __init__.py
+    └── jobs.py              ← fetch_open_jobs()
+```
+
+`fetch_open_jobs()` has no `client_key` argument — it reads `ATS_URL` from env.
+
+## 4. Verify unauthenticated access first
 
 Before adding any credential to config or `.env`, test the stripped request. Public ATS job boards are usually open APIs.
 
-## 4. Ask minimum info when onboarding a new ATS client
+## 5. Ask minimum info when onboarding a new ATS client
 
 When setting up a new ATS client, ask only for what is needed for that provider:
 - **UKG**: only the `LoadSearchResults` URL (from the job board page source or network tab)
 - No cookies, tokens, or browser session data needed
 
-Document the minimum required fields in `config/ats/<provider>/example.json`.
+## 6. Adding a new ATS provider
+
+1. `src/ats/<provider>/__init__.py` (empty)
+2. `src/ats/<provider>/jobs.py` — `fetch_open_jobs() -> int`, reads `ATS_URL` env var
+3. Add routing branch in `src/ats/base.py → _dispatch()`
+4. Add `ats.provider` and `ats.url` to each client's `config/clients/<id>.json`

@@ -144,7 +144,7 @@ def _validate_client_config(data: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("client.ats must be an object")
     ats_norm = dict(ats)
     ats_norm["provider"] = _require_string(ats_norm, "provider", context="client.ats")
-    ats_norm["client_key"] = _require_string(ats_norm, "client_key", context="client.ats")
+    ats_norm["url"] = _require_string(ats_norm, "url", context="client.ats")
     cfg["ats"] = ats_norm
 
     db = cfg.get("db")
