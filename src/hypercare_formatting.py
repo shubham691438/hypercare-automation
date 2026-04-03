@@ -56,7 +56,10 @@ _SHEET_STYLE: dict[str, dict[str, Any]] = {
     TAB_FUNNEL: {
         "frozen_row_count": 1,
         "header_rows": [],
-        "column_pixels": [120, 160, 420, 120, 150, 150, 190],
+        # A:Date  B:Mojo Stage  C:CRM Stage Mapping  D:CRM Count-All
+        # E:CRM Count-Spons  F:Mojo Count-Spons  G:Delta
+        "column_pixels": [110, 160, 500, 130, 160, 160, 200],
+        "wrap_columns": [2],  # C: CRM Stage Mapping — contains comma-separated stage names
     },
     TAB_WEBSITE: {
         "frozen_row_count": 1,
@@ -111,6 +114,25 @@ def apply_hypercare_formatting(client: SheetsClient) -> None:
                         },
                         "properties": {"pixelSize": px},
                         "fields": "pixelSize",
+                    }
+                }
+            )
+
+        for col_idx in cfg.get("wrap_columns", []):
+            requests.append(
+                {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sid,
+                            "startRowIndex": 1,
+                            "endRowIndex": _DATA_END_ROW,
+                            "startColumnIndex": col_idx,
+                            "endColumnIndex": col_idx + 1,
+                        },
+                        "cell": {
+                            "userEnteredFormat": {"wrapStrategy": "WRAP"}
+                        },
+                        "fields": "userEnteredFormat.wrapStrategy",
                     }
                 }
             )
