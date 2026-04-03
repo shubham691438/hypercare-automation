@@ -1,0 +1,14 @@
+{
+  "clients": [
+    {
+      "id": "hypercare",
+      "label": "hypercare (automation workbook)",
+      "spreadsheet_id": "1PghVTvx3FR1WGgqtQTcn0RX0TctlZvb5WX5fmQAdisI"
+    },
+    {
+      "id": "ashley",
+      "label": "Ashley Furniture Hypercare (legacy tracker)",
+      "spreadsheet_id": "1KlYiyaQjxSPn7QDKGwbltWm-MgUkxuFovMv5R55_yrQ"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "ashleyfurniture",
+  "name": "Ashley Furniture",
+  "spreadsheet_id": "1PghVTvx3FR1WGgqtQTcn0RX0TctlZvb5WX5fmQAdisI",
+  "go_live_date": "2026-04-01",
+  "hypercare_days": 10,
+  "enabled_tabs": [
+    "job_ingestion",
+    "mojo_apply",
+    "funnel_tracking"
+  ],
+  "owner": "shubham.k.singh@joveo.com",
+
+  "ats": {
+    "provider": "ukg",
+    "client_key": "ashleyfurniture"
+  },
+
+  "mojo": {
+    "account_id": "ashleyfurniture",
+    "agency_id": "ashleyfurniture",
+    "client_id": "e7a4dc28-7050-4231-bf0e-b6587cfc3862",
+    "jobs_path": "/fna-dashboard/v1/agencies/ashleyfurniture/jobs?page-type=CLIENT_JOBS"
+  },
+
+  "db": {
+    "unified": {
+      "customer_id": "a1af7bd0-ba0e-47b1-bba4-232c168134b8"
+    },
+    "tao": {
+      "source_id": "0nry4yn8zd86a",
+      "client_id": "0nry4ynfzdedx"
+    }
+  }
+}
