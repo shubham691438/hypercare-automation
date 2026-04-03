@@ -159,6 +159,21 @@ Executes:
 PYTHONPATH=src .venv/bin/python scripts/run_hypercare_queries.py
 ```
 
+Running the same day multiple times is safe — the second run updates the existing row in place instead of appending a duplicate.
+
+### Backdated / simulated run
+
+Override the date context via environment variables (useful for testing or catching up after a gap):
+
+```bash
+HYPERCARE_JOB_DATE=2026-03-02 HYPERCARE_REPORT_DATE=2026-03-01 \
+  PYTHONPATH=src .venv/bin/python scripts/run_hypercare_queries.py
+```
+
+`HYPERCARE_JOB_DATE` controls the `Job Ingestion` date column.
+`HYPERCARE_REPORT_DATE` controls `Mojo Apply` and `Funnel Tracking` dates (defaults to one day before `HYPERCARE_JOB_DATE`).
+Re-running with the same date pair updates the existing rows rather than duplicating them.
+
 ### Run all active clients
 
 Loops through `config/clients/*.json` and runs only clients whose hypercare window is still active.
@@ -190,6 +205,24 @@ Timestamp fields written from SQL are converted to IST.
 - The runner appends new daily rows while the client is active.
 - Historical rows remain in the sheet after hypercare ends; the runner simply stops appending.
 - If `go_live_date` is missing, the runner treats the client as runnable but marks the lifecycle as `missing_go_live_date` in `Overview`.
+
+## Append-only write model
+
+Each reporting tab (`Job Ingestion`, `Mojo Apply`, `Funnel Tracking`) uses a **date-keyed, idempotent append model**:
+
+- The first run for a given date appends a new row at the bottom.
+- Re-running on the same date overwrites that row in place — no duplicates.
+- Funnel Tracking appends one row per Mojo stage; the full stage block is replaced when the same date is re-run.
+
+### How row placement works
+
+The runner uses `find_or_next_row()` (for single-row tabs) and `find_funnel_block_start()` (for Funnel Tracking) to locate the correct target row by scanning column A and comparing dates. Both helpers use `_dates_equal()`, which parses date strings before comparing, so ISO format (`2026-04-03`) and Google Sheets display format (`4/3/2026`) are treated as equal.
+
+> **Do not use `sheets.append_rows(..., "'Tab'!A1")`** for native-table tabs. The Google Sheets `values.append` API respects the table's declared row range (e.g. `A1:I1000`) and inserts new rows _after row 1000_, making them invisible. Always use `find_or_next_row` + `sheets.update_range`.
+
+### Bootstrap behaviour
+
+Bootstrap (`scripts/bootstrap_hypercare_workbook.py`) only writes header rows to the reporting tabs. It does **not** pre-populate blank rows, so existing historical data is preserved across bootstrap re-runs. Use `HYPERCARE_BOOTSTRAP_OVERWRITE=1` only when you want to fully reinitialise the Query registry.
 
 ## Current sheet layout
 
@@ -322,9 +355,9 @@ print(json.loads(base64.urlsafe_b64decode(p))['productId'])
 The token is short-lived (~2 hours). When Mojo-backed cells fail with `401` or `Invalid value for: header accessToken`, check **both** expiry and token type. Then rerun the script.
 
 Mojo-backed areas currently include:
-- `Job Ingestion!E2`
-- `Mojo Apply!B2`
-- `Funnel Tracking`
+- `Job Ingestion!E` (Open Jobs on Mojo — all historical rows)
+- `Mojo Apply!B` (Sponsored Applies on Mojo — all historical rows)
+- `Funnel Tracking!B/F` (stage names + sponsored counts — all rows)
 
 ## ATS API notes
 

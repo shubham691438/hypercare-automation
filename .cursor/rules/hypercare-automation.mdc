@@ -168,6 +168,40 @@ Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
 - `scripts/run_all_active_clients.py` loops through `config/clients/*.json` and runs only active clients.
 - `scripts/run_hypercare_queries.py` must append new rows; it must not overwrite row `2` as the primary storage model.
 
+## Append-only row writes — critical rules
+
+### Never use `sheets.append_rows(..., "'{Tab}'!A1")` with a native table
+
+Native Google Sheets tables declare a fixed row range (e.g. `A1:I1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
+
+**Correct pattern:** use `find_or_next_row()` + `sheets.update_range()`:
+
+```python
+target_row, _existing = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="I")
+sheets.update_range(f"'{TAB_JOB}'!A{target_row}:I{target_row}", [row_data])
+```
+
+### Idempotent date-keyed writes
+
+Each run-day gets exactly one row per tab. If a row for the same date already exists, `find_or_next_row()` returns its row number so the data is updated in place — no duplicate rows. This is critical for re-runs and backfills.
+
+`find_or_next_row()` and `find_funnel_block_start()` use `_dates_equal()` which compares parsed `date` objects, not raw strings. This tolerates Google Sheets auto-reformatting ISO dates (e.g. `2026-04-03` → `4/3/2026`).
+
+### Bootstrap must not pre-fill blank rows
+
+`seed_registry_and_reporting_tabs()` must only write header rows. Do **not** pre-populate rows 2–N with empty strings — doing so causes `find_or_next_row` to skip all the blank rows and still land on the wrong row. An empty sheet means `get_range` returns `[]`, and `find_or_next_row` correctly returns row `2`.
+
+### Backdated runs
+
+Use `HYPERCARE_JOB_DATE` / `HYPERCARE_REPORT_DATE` environment variables to simulate a specific run date:
+
+```bash
+HYPERCARE_JOB_DATE=2026-03-02 HYPERCARE_REPORT_DATE=2026-03-01 \
+  PYTHONPATH=src .venv/bin/python scripts/run_hypercare_queries.py
+```
+
+Backdated runs create new rows keyed to those dates. Re-running the same backdated date updates in place.
+
 ## Mojo token refresh
 
 The Mojo `MOJO_ACCESS_TOKEN` is a Cognito JWT that expires in ~2 hours.
@@ -198,6 +232,6 @@ The `funnel-tracking` API strictly validates `productId: mojopro`. The jobs and 
 When Mojo-backed cells fail with `401` or `Invalid value for: header accessToken`, check **both** expiry and token type.
 
 Mojo-backed areas currently include:
-- `Job Ingestion!E2`
-- `Mojo Apply!B2`
-- `Funnel Tracking` rows `2+`
+- `Job Ingestion!E` (Open Jobs on Mojo — whole column, all historical rows)
+- `Mojo Apply!B` (Sponsored Applies on Mojo — whole column)
+- `Funnel Tracking!B/F` (stage names + sponsored counts — all rows)
