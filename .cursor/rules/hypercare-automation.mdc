@@ -88,9 +88,10 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
   - `D` Tao open jobs
   - `E` Mojo open jobs
   - `F` delta (`Mojo - ATS`)
-  - `G` last OPEN job updated (IST)
-  - `H` last CLOSED job updated (IST)
-  - `I` null Mojo↔Tao mappings
+  - `G` Delta Unified − Tao (`(C−D)/C` as percent)
+  - `H` last OPEN job updated (IST)
+  - `I` last CLOSED job updated (IST)
+  - `J` null Mojo↔Tao mappings
 - Keep native table styling as the source of truth for the header. Do not add custom header fills on top of it.
 - If changing the layout, update all three places together:
   1. `JOB_INGESTION_HEADERS` / table definition in `hypercare_bootstrap.py`
@@ -135,10 +136,13 @@ Do not add new env vars unless they are genuinely secret and cannot be derived f
   - green: `abs(delta) <= 10%` of ATS
   - yellow: `10% < abs(delta) <= 25%`
   - red: `abs(delta) > 25%`
-- `G:G` and `H:H`:
+- `G:G` Delta Unified − Tao:
+  - red: value `> 0` (Unified open count higher than Tao)
+  - green: value `<= 0`
+- `H:H` and `I:I`:
   - green: timestamp is today
   - red: timestamp is before today
-- `I:I`:
+- `J:J`:
   - green: `0`
   - red: `>= 1`
 
@@ -197,13 +201,13 @@ Never add ATS HTTP logic to `scripts/` or to modules outside `src/ats/`.
 
 ### Never use `sheets.append_rows(..., "'{Tab}'!A1")` with a native table
 
-Native Google Sheets tables declare a fixed row range (e.g. `A1:I1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
+Native Google Sheets tables declare a fixed row range (e.g. `A1:J1000`). The `values.append` API treats the table boundary as the end of data and deposits every new row **after row 1000** (at row 1001+), making them invisible without scrolling far down.
 
 **Correct pattern:** use `find_or_next_row()` + `sheets.update_range()`:
 
 ```python
 target_row, _existing = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="I")
-sheets.update_range(f"'{TAB_JOB}'!A{target_row}:I{target_row}", [row_data])
+sheets.update_range(f"'{TAB_JOB}'!A{target_row}:J{target_row}", [row_data])
 ```
 
 ### Idempotent date-keyed writes

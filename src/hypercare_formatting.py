@@ -41,8 +41,8 @@ _SHEET_STYLE: dict[str, dict[str, Any]] = {
     TAB_JOB: {
         "frozen_row_count": 1,
         "header_rows": [],
-        # A:Date  B:ATS  C:Unified  D:Tao  E:Mojo  F:Delta  G:Last OPEN ts  H:Last CLOSED ts  I:Null mappings
-        "column_pixels": [110, 170, 180, 150, 150, 140, 250, 250, 210],
+        # A:Date B:ATS C:Unified D:Tao E:Mojo F:ΔATS−Mojo G:ΔUnified−Tao H:OPEN ts I:CLOSED ts J:Null map
+        "column_pixels": [110, 170, 180, 150, 150, 140, 160, 250, 250, 210],
     },
     TAB_MOJO: {
         "frozen_row_count": 1,
@@ -155,20 +155,20 @@ def apply_hypercare_formatting(client: SheetsClient) -> None:
             end_row=_DATA_END_ROW,
             col=5,
         )  # F2:F...
-        _apply_zero_good_nonzero_bad_formatting_range(
-            client,
-            titles[TAB_JOB],
-            start_row=_DATA_START_ROW,
-            end_row=_DATA_END_ROW,
-            col=8,
-        )  # I2:I...
-        _apply_today_freshness_formatting_range(
+        _apply_unified_tao_delta_pct_formatting_range(
             client,
             titles[TAB_JOB],
             start_row=_DATA_START_ROW,
             end_row=_DATA_END_ROW,
             col=6,
-        )  # G2:G...
+        )  # G2:G... red if >0 else green
+        _apply_zero_good_nonzero_bad_formatting_range(
+            client,
+            titles[TAB_JOB],
+            start_row=_DATA_START_ROW,
+            end_row=_DATA_END_ROW,
+            col=9,
+        )  # J2:J...
         _apply_today_freshness_formatting_range(
             client,
             titles[TAB_JOB],
@@ -176,6 +176,13 @@ def apply_hypercare_formatting(client: SheetsClient) -> None:
             end_row=_DATA_END_ROW,
             col=7,
         )  # H2:H...
+        _apply_today_freshness_formatting_range(
+            client,
+            titles[TAB_JOB],
+            start_row=_DATA_START_ROW,
+            end_row=_DATA_END_ROW,
+            col=8,
+        )  # I2:I...
     if TAB_MOJO in titles:
         _apply_percent_threshold_formatting_range(
             client,
@@ -267,6 +274,93 @@ def _apply_percent_threshold_formatting_range(
                 "condition": {
                     "type": "CUSTOM_FORMULA",
                     "values": [{"userEnteredValue": f"=AND(ISNUMBER({cell_ref}),{cell_ref}>{_THRESH_RED})"}],
+                },
+                "format": {"backgroundColor": _bg(0.918, 0.600, 0.600)},
+            },
+        },
+    ]
+    add_reqs = [
+        {"addConditionalFormatRule": {"rule": rule, "index": 0}}
+        for rule in rules
+    ]
+    client.batch_update(add_reqs)
+
+    client.batch_update([
+        {
+            "repeatCell": {
+                "range": {
+                    "sheetId": sid,
+                    "startRowIndex": start_row,
+                    "endRowIndex": end_row,
+                    "startColumnIndex": col,
+                    "endColumnIndex": col + 1,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "numberFormat": {"type": "PERCENT", "pattern": "0.00%"},
+                    }
+                },
+                "fields": "userEnteredFormat.numberFormat",
+            }
+        }
+    ])
+
+
+def _apply_unified_tao_delta_pct_formatting_range(
+    client: SheetsClient,
+    sid: int,
+    *,
+    start_row: int,
+    end_row: int,
+    col: int,
+) -> None:
+    """``(Unified−Tao)/Unified`` as percent: red if > 0, green if <= 0."""
+    existing = client.get_sheet_conditional_formats(sid)
+    delete_reqs: list[dict[str, Any]] = []
+    for i, rule in reversed(list(enumerate(existing))):
+        for row in range(start_row, end_row):
+            if _rule_overlaps_cell(rule, row=row, col=col):
+                delete_reqs.append(
+                    {"deleteConditionalFormatRule": {"sheetId": sid, "index": i}}
+                )
+                break
+    if delete_reqs:
+        client.batch_update(delete_reqs)
+
+    rng: dict[str, Any] = {
+        "sheetId": sid,
+        "startRowIndex": start_row,
+        "endRowIndex": end_row,
+        "startColumnIndex": col,
+        "endColumnIndex": col + 1,
+    }
+    col_letter = chr(65 + col)
+    cell_ref = f"${col_letter}{start_row + 1}"
+
+    def _bg(r: float, g: float, b: float) -> dict[str, float]:
+        return {"red": r, "green": g, "blue": b}
+
+    rules = [
+        {
+            "ranges": [rng],
+            "booleanRule": {
+                "condition": {
+                    "type": "CUSTOM_FORMULA",
+                    "values": [
+                        {"userEnteredValue": f"=AND(ISNUMBER({cell_ref}),{cell_ref}<=0)"},
+                    ],
+                },
+                "format": {"backgroundColor": _bg(0.714, 0.843, 0.659)},
+            },
+        },
+        {
+            "ranges": [rng],
+            "booleanRule": {
+                "condition": {
+                    "type": "CUSTOM_FORMULA",
+                    "values": [
+                        {"userEnteredValue": f"=AND(ISNUMBER({cell_ref}),{cell_ref}>0)"},
+                    ],
                 },
                 "format": {"backgroundColor": _bg(0.918, 0.600, 0.600)},
             },

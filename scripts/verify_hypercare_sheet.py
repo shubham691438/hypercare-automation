@@ -48,7 +48,7 @@ def main() -> None:
     print()
     print("Overview last run:", c.get_range("'Overview'!A13:B15"))
     print()
-    job_rows = c.get_range(f"'{TAB_JOB}'!A2:I1000")
+    job_rows = c.get_range(f"'{TAB_JOB}'!A2:J1000")
     print(f"{TAB_JOB} latest row:", last_nonempty_row(job_rows))
     print()
     mojo_rows = c.get_range(f"'{TAB_MOJO}'!A2:H1000")

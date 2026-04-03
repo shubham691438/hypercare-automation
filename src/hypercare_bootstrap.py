@@ -26,6 +26,7 @@ JOB_INGESTION_HEADERS = [
     "Open Jobs in Tao DB",
     "Open Jobs on Mojo",
     "Delta ATS − Mojo (%)",
+    "Delta Unified − Tao (%)",
     "Last OPEN job updated (IST)",
     "Last CLOSED job updated (IST)",
     "Null Mojo↔Tao mappings",
@@ -100,7 +101,7 @@ def ensure_job_ingestion_native_table(client: SheetsClient) -> None:
             "startRowIndex": 0,
             "endRowIndex": TABLE_MAX_ROWS,
             "startColumnIndex": 0,
-            "endColumnIndex": 9,
+            "endColumnIndex": 10,
         },
         "columnProperties": [
             {"columnIndex": 0, "columnName": "Date", "columnType": "DATE"},
@@ -109,9 +110,10 @@ def ensure_job_ingestion_native_table(client: SheetsClient) -> None:
             {"columnIndex": 3, "columnName": "Open Jobs in Tao DB", "columnType": "DOUBLE"},
             {"columnIndex": 4, "columnName": "Open Jobs on Mojo", "columnType": "DOUBLE"},
             {"columnIndex": 5, "columnName": "Delta ATS − Mojo (%)", "columnType": "PERCENT"},
-            {"columnIndex": 6, "columnName": "Last OPEN job updated (IST)", "columnType": "DATE_TIME"},
-            {"columnIndex": 7, "columnName": "Last CLOSED job updated (IST)", "columnType": "DATE_TIME"},
-            {"columnIndex": 8, "columnName": "Null Mojo↔Tao mappings", "columnType": "DOUBLE"},
+            {"columnIndex": 6, "columnName": "Delta Unified − Tao (%)", "columnType": "PERCENT"},
+            {"columnIndex": 7, "columnName": "Last OPEN job updated (IST)", "columnType": "DATE_TIME"},
+            {"columnIndex": 8, "columnName": "Last CLOSED job updated (IST)", "columnType": "DATE_TIME"},
+            {"columnIndex": 9, "columnName": "Null Mojo↔Tao mappings", "columnType": "DOUBLE"},
         ],
     }
 
@@ -235,7 +237,7 @@ def clear_job_ingestion_manual_header_format(client: SheetsClient) -> None:
                         "startRowIndex": 0,
                         "endRowIndex": 1,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 9,
+                        "endColumnIndex": 10,
                     },
                     "cell": {"userEnteredFormat": {}},
                     "fields": "userEnteredFormat(backgroundColor,textFormat,wrapStrategy,verticalAlignment)",
@@ -259,7 +261,7 @@ def clear_job_ingestion_extra_area_format(client: SheetsClient) -> None:
                         "sheetId": sid,
                         "startRowIndex": 0,
                         "endRowIndex": TABLE_MAX_ROWS,
-                        "startColumnIndex": 9,
+                        "startColumnIndex": 10,
                         "endColumnIndex": 26,
                     },
                     "cell": {"userEnteredFormat": {}},
@@ -535,7 +537,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
                     "Max updated_at OPEN job (IST text)",
                     f"SELECT to_char(max(updated_at AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM-DD HH24:MI:SS.MS') AS v FROM job WHERE customer_id = '{unified_customer_id}' AND status = 'OPEN'",
                     TAB_JOB,
-                    "G2",
+                    "H2",
                 ],
                 [
                     "ji_unified_closed_latest",
@@ -543,7 +545,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
                     "Max updated_at CLOSED job (IST text)",
                     f"SELECT to_char(max(updated_at AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM-DD HH24:MI:SS.MS') AS v FROM job WHERE customer_id = '{unified_customer_id}' AND status = 'CLOSED'",
                     TAB_JOB,
-                    "H2",
+                    "I2",
                 ],
                 [
                     "ji_mojo_tao_null_mapping",
@@ -551,7 +553,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
                     "Jobs with broken Mojo↔Tao mapping (mojo_job_id OR tao_job_id is NULL)",
                     f"SELECT count(*)::text AS v FROM mojo_job_tao_job_mapping mjtjm WHERE mjtjm.tao_client_id = '{tao_client_id}' AND (mjtjm.mojo_job_id IS NULL OR mjtjm.tao_job_id IS NULL)",
                     TAB_JOB,
-                    "I2",
+                    "J2",
                 ],
             ]
         )
@@ -610,7 +612,7 @@ def seed_registry_and_reporting_tabs(client: SheetsClient) -> None:
 
     # Single header row; rows 2+ are append-only history.
     if TAB_JOB in titles:
-        client.update_range(f"'{TAB_JOB}'!A1:I1", [JOB_INGESTION_HEADERS])
+        client.update_range(f"'{TAB_JOB}'!A1:J1", [JOB_INGESTION_HEADERS])
 
     if TAB_MOJO in titles:
         client.update_range(f"'{TAB_MOJO}'!A1:H1", [MOJO_APPLY_HEADERS])
@@ -657,7 +659,7 @@ def bootstrap_hypercare_workbook(client: SheetsClient, *, overwrite: bool = Fals
     # Native table creation/update can reset visible header cells to "Column 1..N".
     # Re-apply the intended labels after the table operation.
     if TAB_JOB in titles:
-        client.update_range(f"'{TAB_JOB}'!A1:I1", [JOB_INGESTION_HEADERS])
+        client.update_range(f"'{TAB_JOB}'!A1:J1", [JOB_INGESTION_HEADERS])
     if TAB_MOJO in titles:
         client.update_range(f"'{TAB_MOJO}'!A1:H1", [MOJO_APPLY_HEADERS])
     if TAB_FUNNEL in titles:

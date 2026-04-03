@@ -278,9 +278,10 @@ One row per day. Date = today.
 | D | Open Jobs in Tao DB | Tao DB |
 | E | Open Jobs on Mojo | Mojo jobs API |
 | F | Delta ATS − Mojo (%) | computed |
-| G | Last OPEN job updated (IST) | Unified DB |
-| H | Last CLOSED job updated (IST) | Unified DB |
-| I | Null Mojo↔Tao mappings | Tao DB |
+| G | Delta Unified − Tao (`(C−D)/C`) (%) | computed |
+| H | Last OPEN job updated (IST) | Unified DB |
+| I | Last CLOSED job updated (IST) | Unified DB |
+| J | Null Mojo↔Tao mappings | Tao DB |
 
 ### `Mojo Apply`
 
@@ -320,8 +321,9 @@ Stage mapping: setup `order=N` → `tthN` in the publishers API `tthStats`.
 | Column(s) | Green | Yellow | Red |
 |-----------|-------|--------|-----|
 | `Job Ingestion!F`, `Mojo Apply!D/H`, `Funnel Tracking!G` | ≤ 10% | 10–25% | > 25% |
-| `Job Ingestion!G` and `H` (timestamps) | today | — | before today |
-| `Job Ingestion!I` (null mappings) | 0 | — | ≥ 1 |
+| `Job Ingestion!G` (Unified − Tao %) | ≤ 0 | — | > 0 |
+| `Job Ingestion!H` and `I` (timestamps) | today | — | before today |
+| `Job Ingestion!J` (null mappings) | 0 | — | ≥ 1 |
 
 ---
 

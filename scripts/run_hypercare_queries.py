@@ -356,6 +356,15 @@ def percent_delta(numerator: object, denominator: object) -> str:
     return str(abs(num - den) / den)
 
 
+def percent_unified_minus_tao_over_unified(unified: object, tao: object) -> str:
+    """(Unified − Tao) / Unified as a fraction for PERCENT cell format (same as *100 in percent terms)."""
+    u = to_number(unified)
+    t = to_number(tao)
+    if u is None or u == 0 or t is None:
+        return ""
+    return str((u - t) / u)
+
+
 def ratio(value: object, total: object) -> str:
     num = to_number(value)
     den = to_number(total)
@@ -805,11 +814,15 @@ def main() -> None:
             registry_results.get("ji_tao_open", ""),
             format_metric_value(open_count if mojo_open_error == "" else f"ERROR: {mojo_open_error}"),
             percent_delta(open_count, website_open),
+            percent_unified_minus_tao_over_unified(
+                registry_results.get("ji_unified_open", ""),
+                registry_results.get("ji_tao_open", ""),
+            ),
             registry_results.get("ji_unified_open_latest", ""),
             registry_results.get("ji_unified_closed_latest", ""),
             registry_results.get("ji_mojo_tao_null_mapping", ""),
         ]
-        job_target, _job_exists = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="I")
+        job_target, _job_exists = find_or_next_row(sheets, TAB_JOB, date_val=jdate, end_col="J")
         col_end = idx_to_col(len(job_row))
         sheets.update_range(f"'{TAB_JOB}'!A{job_target}:{col_end}{job_target}", [job_row])
 
